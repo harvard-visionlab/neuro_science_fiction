@@ -1,6 +1,7 @@
 // API Endpoints
 const SURROGATE_RATERS_URL = 'https://ndcjdmrtswun7t2hzgbj7b7fle0whpro.lambda-url.us-east-1.on.aws/';
 const GENERATE_CSV_URL = 'https://psp3lye7ksadwc6d6krb56dmue0yfxjv.lambda-url.us-east-1.on.aws/';
+const RATING_STATUS_URL = 'https://zfwlalun2v5vkm4bcgnygxqzve0yogwo.lambda-url.us-east-1.on.aws/';
 
 // State
 let surveyData = null;
@@ -27,6 +28,14 @@ const sameFeatureBtn = document.getElementById('sameFeatureBtn');
 const downloadSection = document.getElementById('downloadSection');
 const downloadBtn = document.getElementById('downloadBtn');
 const downloadMessage = document.getElementById('downloadMessage');
+const statusSection = document.getElementById('statusSection');
+const statusLoading = document.getElementById('statusLoading');
+const statTotalFeatures = document.getElementById('statTotalFeatures');
+const statTotalWorkers = document.getElementById('statTotalWorkers');
+const statTotalRatings = document.getElementById('statTotalRatings');
+const statProgress = document.getElementById('statProgress');
+const completionTable = document.getElementById('completionTable');
+const statusMessage = document.getElementById('statusMessage');
 
 // Event Listeners
 uploadArea.addEventListener('click', () => fileInput.click());
@@ -231,7 +240,7 @@ function displaySurveyInfo(filename) {
 
 function displayFeatures() {
     featureList.innerHTML = '';
-    
+
     surveyData.features.forEach((feature, index) => {
         const div = document.createElement('div');
         div.className = 'feature-item';
@@ -242,9 +251,12 @@ function displayFeatures() {
         div.addEventListener('click', () => selectFeature(index));
         featureList.appendChild(div);
     });
-    
+
     featureSection.style.display = 'block';
     downloadSection.style.display = 'block';
+
+    // Fetch and display rating status
+    fetchRatingStatus();
 }
 
 function selectFeature(index) {
@@ -286,6 +298,156 @@ function displayFeatureDetails() {
     } else {
         optionsDiv.style.display = 'none';
     }
+}
+
+// Fetch and Display Rating Status
+async function fetchRatingStatus() {
+    if (!surveyData) return;
+
+    // Show loading state
+    statusSection.style.display = 'block';
+    statusLoading.style.display = 'block';
+    document.getElementById('progressSummary').style.display = 'none';
+    document.getElementById('completionTableContainer').style.display = 'none';
+
+    try {
+        const url = `${RATING_STATUS_URL}?year=${surveyData.year}&groupName=${surveyData.groupName}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (response.ok) {
+            displayProgressSummary(data);
+            displayCompletionTable(data);
+
+            // Hide loading, show content
+            statusLoading.style.display = 'none';
+            document.getElementById('progressSummary').style.display = 'grid';
+            document.getElementById('completionTableContainer').style.display = 'block';
+        } else {
+            console.error('Failed to fetch rating status:', data.error);
+            statusLoading.style.display = 'none';
+            statusMessage.textContent = 'Failed to load rating status';
+            statusMessage.className = 'status-message error';
+        }
+    } catch (error) {
+        console.error('Error fetching rating status:', error);
+        statusLoading.style.display = 'none';
+        statusMessage.textContent = 'Error loading rating status';
+        statusMessage.className = 'status-message error';
+    }
+}
+
+// Display Progress Summary
+function displayProgressSummary(data) {
+    const { totalFeatures, totalRatings } = data.summary || { totalFeatures: 0, totalWorkers: 0, totalRatings: 0 };
+
+    // Use all available models from dropdown for max possible calculation
+    const availableModels = getAvailableModels();
+    const totalAvailableModels = availableModels.length;
+    const maxPossible = totalFeatures * totalAvailableModels;
+    const percentComplete = maxPossible > 0 ? Math.round((totalRatings / maxPossible) * 100) : 0;
+
+    statTotalFeatures.textContent = totalFeatures;
+    statTotalWorkers.textContent = totalAvailableModels;
+    statTotalRatings.textContent = `${totalRatings}/${maxPossible}`;
+    statProgress.textContent = `${percentComplete}%`;
+}
+
+// Get all available models from the dropdown
+function getAvailableModels() {
+    const models = [];
+    const options = modelSelect.querySelectorAll('option');
+    options.forEach(option => {
+        if (option.value) { // Skip the "-- Choose a model --" option
+            models.push(option.value);
+        }
+    });
+    return models;
+}
+
+// Display Completion Table
+function displayCompletionTable(data) {
+    const { features, workers } = data;
+
+    // Get all available models from dropdown
+    const availableModels = getAvailableModels();
+
+    // Merge available models with workers from API (use Set to avoid duplicates)
+    const allWorkers = [...new Set([...availableModels, ...(workers || [])])].sort();
+
+    // If no features found, show empty state
+    if (!features || features.length === 0) {
+        if (allWorkers.length > 0) {
+            // Show table with all models but no features yet
+            completionTable.innerHTML = '<p class="no-data">No features found. Upload a survey to get started!</p>';
+        } else {
+            completionTable.innerHTML = '<p class="no-data">No ratings found yet. Start rating features to see your progress!</p>';
+        }
+        return;
+    }
+
+    // Create table HTML
+    let html = '<table class="status-table"><thead><tr><th>Feature</th>';
+
+    // Add column headers for each worker/model
+    allWorkers.forEach(worker => {
+        html += `<th>${worker}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    // Add rows for each feature
+    features.forEach(feature => {
+        html += `<tr><td class="feature-name-cell">${feature.featureName}</td>`;
+
+        // Add cells for each worker
+        allWorkers.forEach(worker => {
+            const isRated = feature.workers && feature.workers[worker] || false;
+            if (isRated) {
+                html += `<td class="status-cell rated"><span class="checkmark">✓</span></td>`;
+            } else {
+                // Make unrated cells clickable
+                html += `<td class="status-cell unrated clickable" data-feature="${feature.featureName}" data-worker="${worker}" title="Click to select ${feature.featureName} + ${worker}"><span class="empty">—</span></td>`;
+            }
+        });
+
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    completionTable.innerHTML = html;
+
+    // Add click handlers to unrated cells
+    document.querySelectorAll('.status-cell.clickable').forEach(cell => {
+        cell.addEventListener('click', handleCellClick);
+    });
+}
+
+// Handle clicking on an unrated cell in the completion table
+function handleCellClick(e) {
+    const cell = e.currentTarget;
+    const featureName = cell.dataset.feature;
+    const workerName = cell.dataset.worker;
+
+    // Find the feature index
+    const featureIndex = surveyData.features.findIndex(f => f.name === featureName);
+    if (featureIndex === -1) {
+        console.error(`Feature not found: ${featureName}`);
+        return;
+    }
+
+    // Select the feature
+    selectFeature(featureIndex);
+
+    // Set the model dropdown
+    modelSelect.value = workerName;
+    handleModelChange();
+
+    // Scroll to the rating section
+    ratingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Visual feedback
+    showResponse('info', `Selected: ${featureName} + ${workerName}`);
+    setTimeout(() => hideResponse(), 3000);
 }
 
 // Handle Model Selection
@@ -336,10 +498,13 @@ async function handleGetRatings() {
         const data = await response.json();
         
         if (response.ok && data.success) {
-            showResponse('success', data.cached 
+            showResponse('success', data.cached
                 ? `Ratings retrieved from cache. ${data.summary.nounsRated} nouns rated.`
                 : `Ratings completed successfully! ${data.summary.nounsRated} nouns rated.`);
             actionButtons.style.display = 'flex';
+
+            // Refresh rating status to show updated progress
+            fetchRatingStatus();
         } else {
             showResponse('error', data.error || 'Failed to get ratings');
             getRatingsBtn.disabled = false;
@@ -418,6 +583,7 @@ function handleRemoveFile() {
     fileInfo.style.display = 'none';
     uploadArea.style.display = 'block';
     surveyInfo.classList.remove('show');
+    statusSection.style.display = 'none';
     featureSection.style.display = 'none';
     ratingSection.style.display = 'none';
     downloadSection.style.display = 'none';
