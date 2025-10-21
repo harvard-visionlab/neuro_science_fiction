@@ -1,0 +1,72 @@
+{
+  "year": "2025",
+  "groupName": "Testing",
+  "features": [
+    {
+      "name": "living",
+      "definition": "whether something is living or non-living",
+      "question": "Is a <> a living thing?",
+      "type": "yesno"
+    },
+    {
+      "name": "speed",
+      "definition": "how fast can something move",
+      "question": "How fast does a <> move?",
+      "type": "scale",
+      "options": [
+        {
+          "value": 1,
+          "label": "it doesn't move"
+        },
+        {
+          "value": 2,
+          "label": "less than 1 mph"
+        },
+        {
+          "value": 3,
+          "label": "less than 5 mph"
+        },
+        {
+          "value": 4,
+          "label": "less than 25 mph"
+        },
+        {
+          "value": 5,
+          "label": "greater than 25 mph"
+        }
+      ]
+    },
+    {
+      "name": "interaction",
+      "definition": "which body parts you use to interact with something",
+      "question": "Which body parts (if any) do you use to interact with a <>? Please check all that apply.",
+      "type": "checklist",
+      "options": [
+        {
+          "value": 1,
+          "label": "hands"
+        },
+        {
+          "value": 2,
+          "label": "feet"
+        },
+        {
+          "value": 3,
+          "label": "ears"
+        },
+        {
+          "value": 4,
+          "label": "nose"
+        },
+        {
+          "value": 5,
+          "label": "mouth"
+        },
+        {
+          "value": 6,
+          "label": "legs"
+        }
+      ]
+    }
+  ]
+}

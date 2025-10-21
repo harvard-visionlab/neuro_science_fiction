@@ -94,19 +94,21 @@ h2 {
 }
 
 .btn-remove {
-    background: #e74c3c;
+    background: #6c757d;
     color: white;
     border: none;
     border-radius: 50%;
     width: 30px;
     height: 30px;
-    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     transition: background 0.3s;
 }
 
 .btn-remove:hover {
-    background: #c0392b;
+    background: #5a6268;
 }
 
 /* Messages */

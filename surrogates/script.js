@@ -70,21 +70,74 @@ function handleFileSelect(e) {
 
 // File Processing
 function processFile(file) {
-    if (!file.name.endsWith('.txt')) {
-        showError('Please upload a .txt file');
+    const isJson = file.name.endsWith('.json');
+    const isTxt = file.name.endsWith('.txt');
+
+    if (!isJson && !isTxt) {
+        showError('Please upload a .txt or .json file');
         return;
     }
 
     const reader = new FileReader();
     reader.onload = function(e) {
         const content = e.target.result;
-        parseSurvey(content, file.name);
+        if (isJson) {
+            parseJsonSurvey(content, file.name);
+        } else {
+            parseTxtSurvey(content, file.name);
+        }
     };
     reader.readAsText(file);
 }
 
-// Parse Survey File
-function parseSurvey(content, filename) {
+// Parse JSON Survey File (new format)
+function parseJsonSurvey(content, filename) {
+    try {
+        const survey = JSON.parse(content);
+
+        // Validate
+        if (!survey.year || !survey.groupName || !survey.features || survey.features.length === 0) {
+            showError('Invalid survey format. Missing year, groupName, or features.');
+            return;
+        }
+
+        // Validate each feature
+        for (const feature of survey.features) {
+            if (!feature.name || !feature.definition || !feature.question || !feature.type) {
+                showError(`Feature "${feature.name || 'unknown'}" is missing required fields.`);
+                return;
+            }
+
+            if (!['yesno', 'scale', 'checklist'].includes(feature.type)) {
+                showError(`Feature "${feature.name}" has invalid type "${feature.type}". Must be yesno, scale, or checklist.`);
+                return;
+            }
+
+            if ((feature.type === 'scale' || feature.type === 'checklist') && (!feature.options || feature.options.length === 0)) {
+                showError(`Feature "${feature.name}" is type "${feature.type}" but has no options defined.`);
+                return;
+            }
+
+            // Convert options array to the string format expected by the rest of the code
+            if (feature.options && Array.isArray(feature.options)) {
+                feature.optionsArray = feature.options; // Keep original for reference
+                feature.options = feature.options.map(opt => `${opt.value}: ${opt.label}`).join('\n');
+            }
+        }
+
+        // Success!
+        surveyData = survey;
+        displaySurveyInfo(filename);
+        displayFeatures();
+        hideError();
+
+    } catch (error) {
+        showError('Error parsing JSON survey file: ' + error.message);
+    }
+}
+
+// Parse Text Survey File (old format - for backward compatibility)
+function parseTxtSurvey(content, filename) {
     try {
         const lines = content.split('\n').map(line => line.trim()).filter(line => line);
         
