@@ -1,0 +1,28 @@
+year: 2025
+groupName: Testing
+
+feature: living  
+definition: whether something is living or non-living
+question: Is a <> a living thing?
+type: yesno
+
+feature: speed  
+definition: how fast can something move
+question: How fast does a <> move?
+type: scale
+1: it doesn't move
+2: less than 1 mph
+3: less than 5 mph
+4: less than 25 mph
+5: greater than 25 mph
+
+feature: interaction
+definition: which body parts you use to interact with something
+question: Which body parts (if any) do you use to interact with a <>? Please check all that apply.
+type: checklist
+1: hands
+2: feet
+3: ears
+4: nose
+5: mouth
+6: legs

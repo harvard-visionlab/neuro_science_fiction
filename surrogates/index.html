@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surrogate Raters - Feature Survey System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Surrogate Raters</h1>
+            <p class="subtitle">LLM-based Feature Survey Rating System</p>
+        </header>
+
+        <!-- Upload Section -->
+        <section class="card">
+            <h2>1. Upload Your Survey</h2>
+            <div class="upload-area" id="uploadArea">
+                <input type="file" id="fileInput" accept=".txt" style="display: none">
+                <p class="upload-text">Click to upload or drag and drop your survey file</p>
+                <p class="upload-hint">Accepted format: .txt</p>
+            </div>
+            <div id="fileInfo" class="file-info" style="display: none;">
+                <span id="fileName"></span>
+                <button id="removeFile" class="btn-remove">×</button>
+            </div>
+            <div id="errorMessage" class="error-message"></div>
+            <div id="surveyInfo" class="survey-info"></div>
+        </section>
+
+        <!-- Feature Selection -->
+        <section class="card" id="featureSection" style="display: none;">
+            <h2>2. Select Feature to Rate</h2>
+            <div id="featureList" class="feature-list"></div>
+        </section>
+
+        <!-- Rating Configuration -->
+        <section class="card" id="ratingSection" style="display: none;">
+            <h2>3. Configure Rating</h2>
+            <div class="feature-details">
+                <div class="detail-row">
+                    <strong>Year:</strong> <span id="displayYear"></span>
+                </div>
+                <div class="detail-row">
+                    <strong>Group:</strong> <span id="displayGroupName"></span>
+                </div>
+                <div class="detail-row">
+                    <strong>Feature:</strong> <span id="displayFeature"></span>
+                </div>
+                <div class="detail-row">
+                    <strong>Definition:</strong> <span id="displayDefinition"></span>
+                </div>
+                <div class="detail-row">
+                    <strong>Question:</strong> <span id="displayQuestion"></span>
+                </div>
+                <div class="detail-row">
+                    <strong>Type:</strong> <span id="displayType"></span>
+                </div>
+                <div id="displayOptions" class="detail-row" style="display: none;">
+                    <strong>Options:</strong>
+                    <pre id="displayOptionsText"></pre>
+                </div>
+            </div>
+
+            <div class="model-selection">
+                <label for="modelSelect">Select Model:</label>
+                <select id="modelSelect">
+                    <option value="">-- Choose a model --</option>
+                    <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp (Google)</option>
+                    <option value="gemini-2.5-flash">gemini-2.5-flash (Google)</option>
+                    <option value="gpt-4o-mini">gpt-4o-mini (OpenAI)</option>
+                    <option value="gpt-4o">gpt-4o (OpenAI)</option>
+                    <option value="o1-mini">o1-mini (OpenAI)</option>
+                </select>
+            </div>
+
+            <button id="getRatingsBtn" class="btn-primary" disabled>Get Surrogate Ratings</button>
+            
+            <div id="loadingMessage" class="loading-message" style="display: none;">
+                <div class="spinner"></div>
+                <p>Please be patient, this can take up to 2 minutes...</p>
+            </div>
+
+            <div id="responseMessage" class="response-message"></div>
+
+            <div class="action-buttons" style="display: none;" id="actionButtons">
+                <button id="nextFeatureBtn" class="btn-secondary">Next Feature</button>
+                <button id="sameFeatureBtn" class="btn-secondary">Rate with Another Model</button>
+            </div>
+        </section>
+
+        <!-- Download Section -->
+        <section class="card" id="downloadSection" style="display: none;">
+            <h2>4. Download All Ratings</h2>
+            <p>Once you've collected ratings from multiple features and models, download the combined CSV file.</p>
+            <button id="downloadBtn" class="btn-primary">Download All Ratings</button>
+            <div id="downloadMessage" class="response-message"></div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
