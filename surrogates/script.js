@@ -16,7 +16,7 @@ const removeFileBtn = document.getElementById('removeFile');
 const errorMessage = document.getElementById('errorMessage');
 const surveyInfo = document.getElementById('surveyInfo');
 const featureSection = document.getElementById('featureSection');
-const featureList = document.getElementById('featureList');
+const featureSelect = document.getElementById('featureSelect');
 const ratingSection = document.getElementById('ratingSection');
 const modelSelect = document.getElementById('modelSelect');
 const getRatingsBtn = document.getElementById('getRatingsBtn');
@@ -44,6 +44,7 @@ uploadArea.addEventListener('dragleave', handleDragLeave);
 uploadArea.addEventListener('drop', handleDrop);
 fileInput.addEventListener('change', handleFileSelect);
 removeFileBtn.addEventListener('click', handleRemoveFile);
+featureSelect.addEventListener('change', handleFeatureSelectChange);
 modelSelect.addEventListener('change', handleModelChange);
 getRatingsBtn.addEventListener('click', handleGetRatings);
 nextFeatureBtn.addEventListener('click', handleNextFeature);
@@ -239,17 +240,14 @@ function displaySurveyInfo(filename) {
 }
 
 function displayFeatures() {
-    featureList.innerHTML = '';
+    // Clear and populate feature dropdown
+    featureSelect.innerHTML = '<option value="">-- Choose a feature --</option>';
 
     surveyData.features.forEach((feature, index) => {
-        const div = document.createElement('div');
-        div.className = 'feature-item';
-        div.innerHTML = `
-            <div class="feature-name">${feature.name}</div>
-            <div class="feature-type">Type: ${feature.type}</div>
-        `;
-        div.addEventListener('click', () => selectFeature(index));
-        featureList.appendChild(div);
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = `${feature.name} (${feature.type})`;
+        featureSelect.appendChild(option);
     });
 
     featureSection.style.display = 'block';
@@ -259,21 +257,26 @@ function displayFeatures() {
     fetchRatingStatus();
 }
 
+// Handle feature selection from dropdown
+function handleFeatureSelectChange() {
+    const index = parseInt(featureSelect.value);
+    if (!isNaN(index)) {
+        selectFeature(index);
+    } else {
+        // User selected "-- Choose a feature --"
+        ratingSection.style.display = 'none';
+    }
+}
+
 function selectFeature(index) {
     currentFeatureIndex = index;
-    
-    // Update UI
-    document.querySelectorAll('.feature-item').forEach((item, i) => {
-        if (i === index) {
-            item.classList.add('selected');
-        } else {
-            item.classList.remove('selected');
-        }
-    });
-    
+
+    // Update dropdown to show selected feature
+    featureSelect.value = index;
+
     displayFeatureDetails();
     ratingSection.style.display = 'block';
-    
+
     // Reset rating section
     modelSelect.value = '';
     getRatingsBtn.disabled = true;
@@ -522,8 +525,8 @@ function handleNextFeature() {
     const nextIndex = currentFeatureIndex + 1;
     if (nextIndex < surveyData.features.length) {
         selectFeature(nextIndex);
-        // Scroll to rating section
-        ratingSection.scrollIntoView({ behavior: 'smooth' });
+        // Scroll to feature section to see the dropdown
+        featureSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
         showResponse('info', 'You have rated all features!');
     }

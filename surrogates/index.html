@@ -74,7 +74,13 @@
         <!-- Feature Selection -->
         <section class="card" id="featureSection" style="display: none;">
             <h2>3. Select Feature to Rate</h2>
-            <div id="featureList" class="feature-list"></div>
+            <p class="section-hint">Choose a feature from your survey, or click on a cell in the Completion Status table above.</p>
+            <div class="feature-selection">
+                <label for="featureSelect">Select Feature:</label>
+                <select id="featureSelect">
+                    <option value="">-- Choose a feature --</option>
+                </select>
+            </div>
         </section>
 
         <!-- Rating Configuration -->

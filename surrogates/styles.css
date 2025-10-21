@@ -142,43 +142,6 @@ h2 {
     margin-bottom: 10px;
 }
 
-/* Feature List */
-.feature-list {
-    display: grid;
-    gap: 10px;
-}
-
-.feature-item {
-    padding: 15px 20px;
-    background: #f8f9fa;
-    border: 2px solid #dee2e6;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.feature-item:hover {
-    background: #e3f2fd;
-    border-color: #2196f3;
-}
-
-.feature-item.selected {
-    background: #2196f3;
-    color: white;
-    border-color: #1976d2;
-}
-
-.feature-name {
-    font-weight: 600;
-    font-size: 1.1em;
-    margin-bottom: 5px;
-}
-
-.feature-type {
-    font-size: 0.9em;
-    opacity: 0.8;
-}
-
 /* Feature Details */
 .feature-details {
     background: #f8f9fa;
@@ -205,6 +168,41 @@ h2 {
     border-radius: 4px;
     font-size: 0.9em;
     white-space: pre-wrap;
+}
+
+/* Section Hint */
+.section-hint {
+    color: #6c757d;
+    font-size: 0.95em;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+/* Feature Selection */
+.feature-selection {
+    margin: 20px 0;
+}
+
+.feature-selection label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.feature-selection select {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 1em;
+    background: white;
+    cursor: pointer;
+}
+
+.feature-selection select:focus {
+    outline: none;
+    border-color: #2196f3;
 }
 
 /* Model Selection */
