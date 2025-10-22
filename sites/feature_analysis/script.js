@@ -16,7 +16,10 @@ let appState = {
     reliabilityResults: null,
     reliabilityChart: null,
     agreementResults: null,
-    agreementHeatmap: null
+    agreementHeatmap: null,
+    redundancyResults: null,
+    redundancyChart: null,
+    redundancyThresholdValue: 0.7
 };
 
 // DOM Elements - Step 1
@@ -42,6 +45,16 @@ const agreementResults = document.getElementById('agreementResults');
 const step3Next = document.getElementById('step3Next');
 const downloadAgreementChart = document.getElementById('downloadAgreementChart');
 
+// DOM Elements - Step 4
+const computeRedundancyBtn = document.getElementById('computeRedundancyBtn');
+const redundancyLoading = document.getElementById('redundancyLoading');
+const redundancyResults = document.getElementById('redundancyResults');
+const step4Next = document.getElementById('step4Next');
+const redundancyThreshold = document.getElementById('redundancyThreshold');
+const redundancyThresholdValue = document.getElementById('redundancyThresholdValue');
+const downloadRedundancyHeatmap = document.getElementById('downloadRedundancyHeatmap');
+const downloadRedundancyChart = document.getElementById('downloadRedundancyChart');
+
 // Initialize app
 function init() {
     setupEventListeners();
@@ -63,6 +76,13 @@ function setupEventListeners() {
     computeAgreementBtn.addEventListener('click', handleComputeAgreement);
     downloadAgreementChart.addEventListener('click', handleDownloadAgreementChart);
     step3Next.addEventListener('click', () => navigateToStep(4));
+
+    // Step 4
+    computeRedundancyBtn.addEventListener('click', handleComputeRedundancy);
+    redundancyThreshold.addEventListener('input', handleThresholdChange);
+    downloadRedundancyHeatmap.addEventListener('click', handleDownloadRedundancyHeatmap);
+    downloadRedundancyChart.addEventListener('click', handleDownloadRedundancyChart);
+    step4Next.addEventListener('click', () => navigateToStep(5));
 
     // Navigation buttons for other steps
     document.getElementById('step2Prev').addEventListener('click', () => navigateToStep(1));
@@ -454,7 +474,8 @@ function createReliabilityChart() {
 
 function createReliabilityTable() {
     const tableDiv = document.getElementById('reliabilityTable');
-    const data = appState.reliabilityResults;
+    // Sort from high to low (reverse the original ascending order)
+    const data = [...appState.reliabilityResults].reverse();
 
     let html = '<table><thead><tr>';
     html += '<th>Rank</th>';
@@ -466,19 +487,24 @@ function createReliabilityTable() {
     data.forEach((row, index) => {
         let quality = '';
         let corrDisplay = '';
+        let rowClass = '';
 
         if (isNaN(row.avgCorr)) {
             quality = 'No Variance';
             corrDisplay = 'NaN';
+            rowClass = 'row-warning';
         } else {
             corrDisplay = row.avgCorr.toFixed(3);
             if (row.avgCorr >= 0.7) quality = 'Excellent';
             else if (row.avgCorr >= 0.5) quality = 'Good';
             else if (row.avgCorr >= 0.3) quality = 'Fair';
-            else quality = 'Poor';
+            else {
+                quality = 'Poor';
+                rowClass = 'row-poor';
+            }
         }
 
-        html += '<tr>';
+        html += `<tr class="${rowClass}">`;
         html += `<td>${index + 1}</td>`;
         html += `<td>${row.featureName}</td>`;
         html += `<td>${corrDisplay}</td>`;
@@ -616,8 +642,8 @@ function createAgreementSummaryTable() {
     const tableDiv = document.getElementById('agreementSummaryTable');
     const { raters, raterSummary } = appState.agreementResults;
 
-    // Sort raters by average agreement (ascending)
-    const sortedRaters = raters.slice().sort((a, b) => raterSummary[a] - raterSummary[b]);
+    // Sort raters by average agreement (descending - high to low)
+    const sortedRaters = raters.slice().sort((a, b) => raterSummary[b] - raterSummary[a]);
 
     let html = '<table><thead><tr>';
     html += '<th>Rank</th>';
@@ -634,19 +660,24 @@ function createAgreementSummaryTable() {
 
         let quality = '';
         let corrDisplay = '';
+        let rowClass = '';
 
         if (isNaN(avgCorr)) {
             quality = 'No Variance';
             corrDisplay = 'NaN';
+            rowClass = 'row-warning';
         } else {
             corrDisplay = avgCorr.toFixed(3);
             if (avgCorr >= 0.7) quality = 'Excellent';
             else if (avgCorr >= 0.5) quality = 'Good';
             else if (avgCorr >= 0.3) quality = 'Fair';
-            else quality = 'Poor';
+            else {
+                quality = 'Poor';
+                rowClass = 'row-poor';
+            }
         }
 
-        html += '<tr>';
+        html += `<tr class="${rowClass}">`;
         html += `<td>${index + 1}</td>`;
         html += `<td>${rater}</td>`;
         html += `<td><span class="rater-type ${typeClass}">${raterType}</span></td>`;
@@ -717,23 +748,36 @@ function createAgreementDetailTable() {
     const validResults = results.filter(row => !isNaN(row.avgCorr));
     const nanCount = results.length - validResults.length;
 
+    // Sort by avgCorr descending (highest first), then by feature name
+    validResults.sort((a, b) => {
+        if (b.avgCorr !== a.avgCorr) {
+            return b.avgCorr - a.avgCorr;
+        }
+        return a.featureName.localeCompare(b.featureName);
+    });
+
     let html = '';
 
     if (nanCount > 0) {
         html += `<p class="explanation-text" style="margin-bottom: 15px;">
-            <strong>Note:</strong> Showing ${validResults.length} valid results.
+            <strong>Note:</strong> Showing ${validResults.length} valid results (sorted by correlation, highest first).
             ${nanCount} NaN values (from ${zeroVarianceFeatures.length} zero-variance features) are hidden.
         </p>`;
     }
 
-    html += '<table><thead><tr>';
-    html += '<th>Feature</th>';
-    html += '<th>Rater</th>';
-    html += '<th>Avg Correlation</th>';
+    html += '<table style="width: 80%;"><thead><tr>';
+    html += '<th style="width: 35%;">Feature</th>';
+    html += '<th style="width: 35%;">Rater</th>';
+    html += '<th style="width: 30%;">Avg Correlation</th>';
     html += '</tr></thead><tbody>';
 
     validResults.forEach(row => {
-        html += '<tr>';
+        let rowClass = '';
+        if (row.avgCorr < 0.3) {
+            rowClass = 'row-poor';
+        }
+
+        html += `<tr class="${rowClass}">`;
         html += `<td>${row.featureName}</td>`;
         html += `<td>${row.rater}</td>`;
         html += `<td>${row.avgCorr.toFixed(3)}</td>`;
@@ -751,6 +795,364 @@ function handleDownloadAgreementChart() {
         height: 1000,
         filename: `${appState.year}_${appState.groupName}_rater_agreement`
     });
+}
+
+// Step 4: Feature Redundancy
+async function handleComputeRedundancy() {
+    if (!appState.df) {
+        alert('Please complete Step 1 (Load Data) first');
+        return;
+    }
+
+    // Show loading
+    redundancyLoading.style.display = 'block';
+    redundancyResults.style.display = 'none';
+    computeRedundancyBtn.disabled = true;
+
+    // Use setTimeout to allow UI to update
+    setTimeout(() => {
+        try {
+            // Compute feature redundancy
+            const { featureVsFeature } = computeFeatureVsFeatureCorr(appState.df);
+            const pairs = computeFeatureRedundancy(appState.df);
+            const features = appState.df.unique('featureName');
+
+            // Store results
+            appState.redundancyResults = {
+                featureVsFeature: featureVsFeature,
+                pairs: pairs,
+                features: features
+            };
+
+            // Display results
+            displayRedundancyResults();
+
+            // Show results
+            redundancyLoading.style.display = 'none';
+            redundancyResults.style.display = 'block';
+
+            // Enable next button
+            step4Next.disabled = false;
+
+        } catch (error) {
+            console.error('Error computing redundancy:', error);
+            alert(`Error computing redundancy: ${error.message}`);
+            redundancyLoading.style.display = 'none';
+            computeRedundancyBtn.disabled = false;
+        }
+    }, 100);
+}
+
+function displayRedundancyResults() {
+    // Create heatmap
+    createRedundancyHeatmap();
+
+    // Create bar chart (with threshold)
+    createRedundancyChart();
+
+    // Create summary
+    updateRedundancySummary();
+
+    // Create detailed table
+    createRedundancyTable();
+}
+
+function createRedundancyHeatmap() {
+    const { featureVsFeature, features } = appState.redundancyResults;
+
+    // Filter out features with all NaN values (except self-correlation)
+    const validFeatureIndices = [];
+    const validFeatures = [];
+
+    for (let i = 0; i < features.length; i++) {
+        // Check if this feature has at least some valid correlations with OTHER features
+        let hasValidData = false;
+        for (let j = 0; j < features.length; j++) {
+            if (i !== j && !isNaN(featureVsFeature[i][j])) {
+                hasValidData = true;
+                break;
+            }
+        }
+        if (hasValidData) {
+            validFeatureIndices.push(i);
+            validFeatures.push(features[i]);
+        }
+    }
+
+    // Create filtered matrix
+    const filteredMatrix = [];
+    for (let i of validFeatureIndices) {
+        const row = [];
+        for (let j of validFeatureIndices) {
+            row.push(featureVsFeature[i][j]);
+        }
+        filteredMatrix.push(row);
+    }
+
+    // Custom colorscale: Blue (negative) → Black (0) → Red (positive)
+    const customColorscale = [
+        [0.0, 'rgb(0, 0, 255)'],      // -1.0: Blue
+        [0.25, 'rgb(100, 100, 200)'], // -0.5: Light blue
+        [0.5, 'rgb(0, 0, 0)'],        //  0.0: Black
+        [0.75, 'rgb(200, 100, 100)'], //  0.5: Light red
+        [1.0, 'rgb(255, 0, 0)']       //  1.0: Red
+    ];
+
+    // Create heatmap data in Plotly format
+    const data = [{
+        z: filteredMatrix,
+        x: validFeatures,
+        y: validFeatures,
+        type: 'heatmap',
+        colorscale: customColorscale,
+        zmin: -1,
+        zmax: 1,
+        hoverongaps: false,
+        hovertemplate: '%{y} vs %{x}<br>Correlation: %{z:.3f}<extra></extra>',
+        colorbar: {
+            title: 'Correlation',
+            titleside: 'right',
+            tickmode: 'linear',
+            tick0: -1,
+            dtick: 0.5
+        }
+    }];
+
+    const layout = {
+        xaxis: {
+            title: '',
+            side: 'bottom',
+            tickangle: -45
+        },
+        yaxis: {
+            title: '',
+            autorange: 'reversed'
+        },
+        width: 700,
+        height: 700,
+        margin: { l: 150, r: 100, t: 50, b: 150 }
+    };
+
+    const config = {
+        responsive: true,
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d']
+    };
+
+    Plotly.newPlot('redundancyHeatmap', data, layout, config);
+}
+
+function createRedundancyChart() {
+    const canvas = document.getElementById('redundancyChart');
+    const ctx = canvas.getContext('2d');
+
+    // Destroy existing chart if it exists
+    if (appState.redundancyChart) {
+        appState.redundancyChart.destroy();
+    }
+
+    const { pairs } = appState.redundancyResults;
+    const threshold = appState.redundancyThresholdValue;
+
+    // Filter pairs above threshold and reverse (highest first)
+    const filteredPairs = pairs
+        .filter(p => p.absCorrelation >= threshold)
+        .reverse()
+        .slice(0, 20); // Show top 20
+
+    if (filteredPairs.length === 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = '16px sans-serif';
+        ctx.fillStyle = '#666';
+        ctx.textAlign = 'center';
+        ctx.fillText('No feature pairs above threshold', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    appState.redundancyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: filteredPairs.map(p => p.pair),
+            datasets: [{
+                label: 'Absolute Correlation',
+                data: filteredPairs.map(p => p.absCorrelation),
+                backgroundColor: filteredPairs.map(p => {
+                    if (p.absCorrelation >= 0.9) return 'rgba(220, 53, 69, 0.8)';  // Red
+                    if (p.absCorrelation >= 0.7) return 'rgba(255, 193, 7, 0.8)';  // Yellow
+                    return 'rgba(33, 150, 243, 0.8)';  // Blue
+                }),
+                borderColor: filteredPairs.map(p => {
+                    if (p.absCorrelation >= 0.9) return 'rgb(220, 53, 69)';
+                    if (p.absCorrelation >= 0.7) return 'rgb(255, 193, 7)';
+                    return 'rgb(33, 150, 243)';
+                }),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const pair = filteredPairs[context.dataIndex];
+                            return `|r| = ${pair.absCorrelation.toFixed(3)} (${pair.sign})`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    min: 0,
+                    max: 1,
+                    title: {
+                        display: true,
+                        text: 'Absolute Correlation'
+                    }
+                },
+                y: {
+                    ticks: {
+                        autoSkip: false,
+                        font: {
+                            size: 10
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateRedundancySummary() {
+    const summaryDiv = document.getElementById('redundantPairsSummary');
+    const { pairs } = appState.redundancyResults;
+    const threshold = appState.redundancyThresholdValue;
+
+    const redundantPairs = pairs.filter(p => p.absCorrelation >= threshold);
+    const veryHighPairs = pairs.filter(p => p.absCorrelation >= 0.9);
+
+    let html = '<h3>Summary</h3>';
+    html += '<div class="summary-grid">';
+    html += `<div class="summary-item">
+        <div class="summary-label">Total Feature Pairs:</div>
+        <div class="summary-value">${pairs.length}</div>
+    </div>`;
+    html += `<div class="summary-item">
+        <div class="summary-label">Above Threshold (${threshold.toFixed(2)}):</div>
+        <div class="summary-value">${redundantPairs.length}</div>
+    </div>`;
+    html += `<div class="summary-item">
+        <div class="summary-label">Very High (≥ 0.9):</div>
+        <div class="summary-value" style="color: #dc3545;">${veryHighPairs.length}</div>
+    </div>`;
+    html += '</div>';
+
+    if (veryHighPairs.length > 0) {
+        html += '<div class="note" style="margin-top: 20px;">';
+        html += '<strong>⚠️ Warning:</strong> You have ' + veryHighPairs.length + ' feature pair(s) with very high redundancy (≥ 0.9). ';
+        html += 'Consider dropping one feature from each pair to reduce multicollinearity.';
+        html += '</div>';
+    }
+
+    summaryDiv.innerHTML = html;
+}
+
+function createRedundancyTable() {
+    const tableDiv = document.getElementById('redundancyTable');
+    const { pairs } = appState.redundancyResults;
+
+    // Sort by absolute correlation descending (highest first)
+    const sortedPairs = [...pairs].sort((a, b) => {
+        // Handle NaN values - put them at the end
+        if (isNaN(a.absCorrelation) && isNaN(b.absCorrelation)) return 0;
+        if (isNaN(a.absCorrelation)) return 1;
+        if (isNaN(b.absCorrelation)) return -1;
+        return b.absCorrelation - a.absCorrelation;
+    });
+
+    let html = '<table><thead><tr>';
+    html += '<th>Rank</th>';
+    html += '<th>Feature 1</th>';
+    html += '<th>Feature 2</th>';
+    html += '<th>Correlation</th>';
+    html += '<th>|Correlation|</th>';
+    html += '<th>Redundancy</th>';
+    html += '</tr></thead><tbody>';
+
+    sortedPairs.forEach((pair, index) => {
+        let quality = '';
+        let corrDisplay = '';
+        let absCorrDisplay = '';
+        let rowClass = '';
+
+        if (isNaN(pair.correlation)) {
+            corrDisplay = 'NaN';
+            absCorrDisplay = 'NaN';
+            quality = '—';  // Em dash for no data
+            rowClass = 'row-warning';
+        } else {
+            corrDisplay = pair.correlation.toFixed(3);
+            absCorrDisplay = pair.absCorrelation.toFixed(3);
+
+            if (pair.absCorrelation >= 0.9) {
+                quality = 'Very High';
+                rowClass = 'row-redundant';
+            } else if (pair.absCorrelation >= 0.7) {
+                quality = 'Moderate';
+            } else if (pair.absCorrelation >= 0.5) {
+                quality = 'Low';
+            } else {
+                quality = 'Independent';
+            }
+        }
+
+        html += `<tr class="${rowClass}">`;
+        html += `<td>${index + 1}</td>`;
+        html += `<td>${pair.feature1}</td>`;
+        html += `<td>${pair.feature2}</td>`;
+        html += `<td>${corrDisplay}</td>`;
+        html += `<td>${absCorrDisplay}</td>`;
+        html += `<td>${quality}</td>`;
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    tableDiv.innerHTML = html;
+}
+
+function handleThresholdChange(event) {
+    const newThreshold = parseFloat(event.target.value);
+    appState.redundancyThresholdValue = newThreshold;
+    redundancyThresholdValue.textContent = newThreshold.toFixed(2);
+
+    // Update chart and summary if results exist
+    if (appState.redundancyResults) {
+        createRedundancyChart();
+        updateRedundancySummary();
+    }
+}
+
+function handleDownloadRedundancyHeatmap() {
+    Plotly.downloadImage('redundancyHeatmap', {
+        format: 'png',
+        width: 1000,
+        height: 1000,
+        filename: `${appState.year}_${appState.groupName}_feature_redundancy_heatmap`
+    });
+}
+
+function handleDownloadRedundancyChart() {
+    const canvas = document.getElementById('redundancyChart');
+    const link = document.createElement('a');
+    link.download = `${appState.year}_${appState.groupName}_feature_redundancy_chart.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
 }
 
 // Initialize app when DOM is ready

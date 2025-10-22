@@ -294,14 +294,118 @@
             </div>
         </section>
 
-        <!-- Steps 4-6 placeholders -->
+        <!-- Step 4: Feature Redundancy -->
         <section class="step-section" id="step4">
             <div class="card">
-                <h2>Step 4: Feature Redundancy</h2>
-                <p><em>Coming soon...</em></p>
+                <div class="step-header">
+                    <h2>Step 4: Feature Redundancy</h2>
+                </div>
+
+                <div class="explanation">
+                    <h3>What is Feature Redundancy?</h3>
+                    <p>Feature redundancy identifies features that are highly correlated with each other. Redundant features provide little additional information and can cause problems in regression models.</p>
+
+                    <details>
+                        <summary>How does it work?</summary>
+                        <div class="explanation-detail">
+                            <p><strong>For each item separately:</strong></p>
+                            <ol>
+                                <li>Average all raters' ratings for Feature 1 (e.g., "animacy")</li>
+                                <li>Average all raters' ratings for Feature 2 (e.g., "size")</li>
+                                <li>Correlate these two vectors across all items (e.g., 60 items)</li>
+                                <li>Repeat for all pairs of features</li>
+                            </ol>
+                            <p><strong>Example:</strong> If "living" and "animacy" both have high ratings for dogs/cats and low ratings for rocks/chairs, they'll have high positive correlation (redundant).</p>
+                            <p><strong>High correlation (> 0.9) = redundant features</strong></p>
+                            <p>Consider dropping one feature from highly redundant pairs.</p>
+                        </div>
+                    </details>
+
+                    <div class="note">
+                        <strong>Why does this matter?</strong>
+                        <ul>
+                            <li>Redundant features waste effort in rating</li>
+                            <li>Can cause multicollinearity problems in regression</li>
+                            <li>Make it harder to interpret which features are important</li>
+                            <li>Goal: Keep diverse, independent features</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div id="redundancyAnalysis">
+                    <button id="computeRedundancyBtn" class="btn-primary">Compute Feature Redundancy</button>
+
+                    <div id="redundancyLoading" class="loading-message" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Computing feature-vs-feature correlations...</p>
+                    </div>
+
+                    <div id="redundancyResults" style="display: none;">
+                        <div class="results-header">
+                            <h3>Feature Redundancy Results</h3>
+                        </div>
+
+                        <!-- Threshold Control -->
+                        <div class="threshold-control">
+                            <label for="redundancyThreshold">Redundancy Threshold (show pairs above):</label>
+                            <input type="range" id="redundancyThreshold" min="0" max="1" step="0.05" value="0.7">
+                            <span id="redundancyThresholdValue">0.70</span>
+                            <p class="explanation-text">Pairs with absolute correlation above this threshold are considered redundant.</p>
+                        </div>
+
+                        <!-- Redundant Pairs Summary -->
+                        <div id="redundantPairsSummary" class="data-summary"></div>
+
+                        <!-- Heatmap -->
+                        <div class="heatmap-section">
+                            <h4>Feature-vs-Feature Correlation Heatmap</h4>
+                            <div class="results-header">
+                                <p class="explanation-text">
+                                    Shows correlation between each pair of features (averaged ratings across all items).
+                                    Darker red = strong positive correlation. Darker blue = strong negative correlation.
+                                </p>
+                                <button id="downloadRedundancyHeatmap" class="btn-download">Download Heatmap (PNG)</button>
+                            </div>
+                            <div id="redundancyHeatmap" class="plotly-heatmap"></div>
+                        </div>
+
+                        <!-- Bar Chart of Top Redundant Pairs -->
+                        <div class="chart-section">
+                            <h4>Most Redundant Feature Pairs</h4>
+                            <div class="results-header">
+                                <p class="explanation-text">
+                                    Feature pairs sorted by absolute correlation (highest first).
+                                    Only showing pairs above the threshold.
+                                </p>
+                                <button id="downloadRedundancyChart" class="btn-download">Download Chart (PNG)</button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="redundancyChart"></canvas>
+                            </div>
+                        </div>
+
+                        <details class="data-table-section">
+                            <summary>View All Feature Pairs Data</summary>
+                            <div id="redundancyTable"></div>
+                        </details>
+
+                        <div class="interpretation">
+                            <h4>Interpretation Guide:</h4>
+                            <ul>
+                                <li><strong>|r| &gt; 0.9:</strong> Very high redundancy - strongly consider dropping one feature</li>
+                                <li><strong>|r| = 0.7-0.9:</strong> Moderate redundancy - features are related but may provide different information</li>
+                                <li><strong>|r| = 0.5-0.7:</strong> Low redundancy - features are somewhat related</li>
+                                <li><strong>|r| &lt; 0.5:</strong> Independent features - both should be kept</li>
+                                <li><strong>Positive correlation:</strong> Features move together (e.g., "living" and "animacy")</li>
+                                <li><strong>Negative correlation:</strong> Features move oppositely (e.g., "natural" and "artificial")</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="step-navigation">
                     <button id="step4Prev" class="btn-prev">← Previous</button>
-                    <button id="step4Next" class="btn-next">Next →</button>
+                    <button id="step4Next" class="btn-next" disabled>Next: Item Similarity →</button>
                 </div>
             </div>
         </section>
