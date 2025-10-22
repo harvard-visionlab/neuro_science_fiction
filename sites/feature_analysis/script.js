@@ -7,10 +7,13 @@ const GENERATE_CSV_URL = 'https://psp3lye7ksadwc6d6krb56dmue0yfxjv.lambda-url.us
 
 // Global state
 let appState = {
-    df: null,
+    rawDf: null,  // Unfiltered data (after removing incomplete raters)
+    df: null,     // Filtered data (after applying exclusions)
     year: null,
     groupName: null,
     droppedRaters: [],
+    excludedRaters: [],
+    excludedFeatures: [],
     currentStep: 1,
     ratingsByFeature: null,
     reliabilityResults: null,
@@ -32,6 +35,7 @@ const loadDataBtn = document.getElementById('loadDataBtn');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const dataLoadError = document.getElementById('dataLoadError');
 const dataSummary = document.getElementById('dataSummary');
+const downloadLoadedDataBtn = document.getElementById('downloadLoadedDataBtn');
 const step1Next = document.getElementById('step1Next');
 
 // DOM Elements - Step 2
@@ -78,6 +82,7 @@ function init() {
 function setupEventListeners() {
     // Step 1
     loadDataBtn.addEventListener('click', handleLoadData);
+    downloadLoadedDataBtn.addEventListener('click', handleDownloadLoadedData);
     step1Next.addEventListener('click', () => navigateToStep(2));
 
     // Step 2
@@ -190,15 +195,59 @@ function navigateToStep(stepNum) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// Standardize group name: lowercase and replace spaces with underscores
+function standardizeGroupName(name) {
+    return name.trim().toLowerCase().replace(/\s+/g, '_');
+}
+
+// localStorage functions for exclusions
+function getExclusionsKey(year, groupName) {
+    return `exclusions_${year}_${groupName}`;
+}
+
+function loadExclusions(year, groupName) {
+    const key = getExclusionsKey(year, groupName);
+    const saved = localStorage.getItem(key);
+    if (saved) {
+        try {
+            const exclusions = JSON.parse(saved);
+            appState.excludedRaters = exclusions.excludedRaters || [];
+            appState.excludedFeatures = exclusions.excludedFeatures || [];
+            console.log('Loaded exclusions from localStorage:', exclusions);
+        } catch (e) {
+            console.error('Error loading exclusions:', e);
+            appState.excludedRaters = [];
+            appState.excludedFeatures = [];
+        }
+    } else {
+        appState.excludedRaters = [];
+        appState.excludedFeatures = [];
+    }
+}
+
+function saveExclusions(year, groupName) {
+    const key = getExclusionsKey(year, groupName);
+    const exclusions = {
+        excludedRaters: appState.excludedRaters,
+        excludedFeatures: appState.excludedFeatures
+    };
+    localStorage.setItem(key, JSON.stringify(exclusions));
+    console.log('Saved exclusions to localStorage:', exclusions);
+}
+
 // Step 1: Load Data
 async function handleLoadData() {
     const year = yearInput.value.trim();
-    const groupName = groupNameInput.value.trim();
+    const groupNameRaw = groupNameInput.value.trim();
 
-    if (!year || !groupName) {
+    if (!year || !groupNameRaw) {
         showError('Please enter both year and group name');
         return;
     }
+
+    // Standardize group name
+    const groupName = standardizeGroupName(groupNameRaw);
+    console.log(`Standardized group name: "${groupNameRaw}" → "${groupName}"`);
 
     // Show loading
     loadingIndicator.style.display = 'block';
@@ -207,29 +256,68 @@ async function handleLoadData() {
     loadDataBtn.disabled = true;
 
     try {
-        // Fetch CSV from Lambda
-        const url = `${GENERATE_CSV_URL}?year=${year}&groupName=${groupName}`;
-        const response = await fetch(url);
+        // Fetch surrogate (LLM) ratings from Lambda
+        const surrogateUrl = `${GENERATE_CSV_URL}?year=${year}&groupName=${groupName}`;
+        console.log('Fetching surrogate ratings from:', surrogateUrl);
+        const surrogateResponse = await fetch(surrogateUrl);
 
-        if (!response.ok) {
-            throw new Error(`Failed to load data: ${response.statusText}`);
+        if (!surrogateResponse.ok) {
+            throw new Error(`Failed to load surrogate data: ${surrogateResponse.statusText}`);
         }
 
-        const csvText = await response.text();
+        const surrogateCsvText = await surrogateResponse.text();
 
-        // Parse CSV
-        const parsed = Papa.parse(csvText, {
+        // Fetch human ratings from scorsese server
+        const humanUrl = `https://scorsese.wjh.harvard.edu/turk/experiments/nsf/survey/${groupName}/data`;
+        console.log('Fetching human ratings from:', humanUrl);
+
+        let humanCsvText = '';
+        let humanData = [];
+
+        try {
+            const humanResponse = await fetch(humanUrl);
+            if (humanResponse.ok) {
+                humanCsvText = await humanResponse.text();
+                const humanParsed = Papa.parse(humanCsvText, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true
+                });
+                humanData = humanParsed.data;
+                console.log(`Loaded ${humanData.length} human ratings`);
+            } else {
+                console.warn('Human ratings not found, using only surrogate ratings');
+            }
+        } catch (humanError) {
+            console.warn('Could not fetch human ratings:', humanError.message);
+            console.log('Continuing with surrogate ratings only');
+        }
+
+        // Parse surrogate CSV
+        const surrogateParsed = Papa.parse(surrogateCsvText, {
             header: true,
             dynamicTyping: true,
             skipEmptyLines: true
         });
 
-        if (parsed.errors.length > 0) {
-            console.error('CSV parsing errors:', parsed.errors);
+        if (surrogateParsed.errors.length > 0) {
+            console.error('CSV parsing errors (surrogate):', surrogateParsed.errors);
         }
 
+        const surrogateData = surrogateParsed.data;
+        console.log(`Loaded ${surrogateData.length} surrogate ratings`);
+
+        // Merge human and surrogate data
+        const allData = [...humanData, ...surrogateData];
+        console.log(`Total ratings after merge: ${allData.length}`);
+
+        // Add workerType to each row
+        allData.forEach(row => {
+            row.workerType = categorizeRater(row.workerId);
+        });
+
         // Create DataFrame
-        let df = createDataFrame(parsed.data);
+        let df = createDataFrame(allData);
 
         // Filter out incomplete raters
         const filterResult = filterIncompleteRaters(df);
@@ -259,6 +347,31 @@ async function handleLoadData() {
 function showError(message) {
     dataLoadError.textContent = message;
     dataLoadError.style.display = 'block';
+}
+
+function handleDownloadLoadedData() {
+    if (!appState.df || !appState.df.data) {
+        alert('No data loaded. Please load data first.');
+        return;
+    }
+
+    // Convert DataFrame back to CSV using PapaParse
+    const csv = Papa.unparse(appState.df.data);
+
+    // Create blob and download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${appState.year}_${appState.groupName}_loaded_data.csv`);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
 }
 
 function displayDataSummary() {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surrogate Raters - Feature Survey System</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
     <div class="container">
@@ -64,7 +64,35 @@
 
             <div id="completionTableContainer" class="completion-table-container">
                 <h3>Completion Status</h3>
-                <p class="table-hint">Click on any "—" cell to select that feature and model for rating. <b>You don't need to use ALL models</b>, but choose at least 2.</p>
+                <p class="table-hint">Click on any "—" cell to select that feature and model for rating. <b>You don't need to use ALL models</b>, but choose at least 3.</p>
+
+                <details class="model-guide">
+                    <summary>Model Guide - What's the difference between these models?</summary>
+                    <div class="model-guide-content">
+                        <p class="guide-intro">Different models may produce different ratings - this variation is expected and can be valuable for understanding feature reliability.</p>
+
+                        <div class="model-description">
+                            <strong>gemini-2.5-flash</strong> (Google) - Fast, efficient model optimized for quick responses. Designed for straightforward tasks.
+                        </div>
+
+                        <div class="model-description">
+                            <strong>gemini-2.5-pro</strong> (Google) - Advanced version with enhanced reasoning capabilities. May provide more detailed responses for complex features.
+                        </div>
+
+                        <div class="model-description">
+                            <strong>gpt-5</strong> (OpenAI) - Large-scale language model with broad knowledge across domains. Generally considered OpenAI's most capable general-purpose model.
+                        </div>
+
+                        <div class="model-description">
+                            <strong>gpt-5-mini</strong> (OpenAI) - Compact version designed to balance efficiency with capability. Good starting point for most rating tasks.
+                        </div>
+
+                        <div class="model-description">
+                            <strong>o3-mini</strong> (OpenAI) - Specialized reasoning model that uses extended thinking processes. Designed for tasks requiring analytical judgment.
+                        </div>
+                    </div>
+                </details>
+
                 <div id="completionTable" class="completion-table"></div>
             </div>
 
@@ -147,6 +175,6 @@
         </section>
     </div>
 
-    <script src="script.js?v=3"></script>
+    <script src="script.js?v=6"></script>
 </body>
 </html>

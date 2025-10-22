@@ -375,7 +375,7 @@ function getAvailableModels() {
 
 // Display Completion Table
 function displayCompletionTable(data) {
-    const { features, workers } = data;
+    const { features: apiFeatures, workers } = data;
 
     // Get all available models from dropdown
     const availableModels = getAvailableModels();
@@ -383,15 +383,18 @@ function displayCompletionTable(data) {
     // Merge available models with workers from API (use Set to avoid duplicates)
     const allWorkers = [...new Set([...availableModels, ...(workers || [])])].sort();
 
-    // If no features found, show empty state
-    if (!features || features.length === 0) {
-        if (allWorkers.length > 0) {
-            // Show table with all models but no features yet
-            completionTable.innerHTML = '<p class="no-data">No features found. Upload a survey to get started!</p>';
-        } else {
-            completionTable.innerHTML = '<p class="no-data">No ratings found yet. Start rating features to see your progress!</p>';
-        }
+    // Use features from uploaded survey, not from API
+    if (!surveyData || !surveyData.features || surveyData.features.length === 0) {
+        completionTable.innerHTML = '<p class="no-data">No features found. Upload a survey to get started!</p>';
         return;
+    }
+
+    // Create a lookup map for API features (what's been rated)
+    const ratedFeaturesMap = {};
+    if (apiFeatures) {
+        apiFeatures.forEach(feature => {
+            ratedFeaturesMap[feature.featureName] = feature.workers || {};
+        });
     }
 
     // Create table HTML
@@ -403,18 +406,18 @@ function displayCompletionTable(data) {
     });
     html += '</tr></thead><tbody>';
 
-    // Add rows for each feature
-    features.forEach(feature => {
-        html += `<tr><td class="feature-name-cell">${feature.featureName}</td>`;
+    // Add rows for each feature from the uploaded survey
+    surveyData.features.forEach(feature => {
+        html += `<tr><td class="feature-name-cell">${feature.name}</td>`;
 
         // Add cells for each worker
         allWorkers.forEach(worker => {
-            const isRated = feature.workers && feature.workers[worker] || false;
+            const isRated = ratedFeaturesMap[feature.name] && ratedFeaturesMap[feature.name][worker] || false;
             if (isRated) {
                 html += `<td class="status-cell rated"><span class="checkmark">✓</span></td>`;
             } else {
                 // Make unrated cells clickable
-                html += `<td class="status-cell unrated clickable" data-feature="${feature.featureName}" data-worker="${worker}" title="Click to select ${feature.featureName} + ${worker}"><span class="empty">—</span></td>`;
+                html += `<td class="status-cell unrated clickable" data-feature="${feature.name}" data-worker="${worker}" title="Click to select ${feature.name} + ${worker}"><span class="empty">—</span></td>`;
             }
         });
 
