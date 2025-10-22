@@ -410,13 +410,136 @@
             </div>
         </section>
 
+        <!-- Step 5: Item Similarity -->
         <section class="step-section" id="step5">
             <div class="card">
-                <h2>Step 5: Item Similarity</h2>
-                <p><em>Coming soon...</em></p>
+                <div class="step-header">
+                    <h2>Step 5: Item Similarity</h2>
+                </div>
+
+                <div class="explanation">
+                    <h3>What is Item Similarity?</h3>
+                    <p>Item similarity identifies items (e.g., images) that have very similar feature profiles. Even with perfect features, if your items are too similar, brain prediction models will struggle to distinguish them.</p>
+
+                    <details>
+                        <summary>How does it work?</summary>
+                        <div class="explanation-detail">
+                            <p><strong>For each item (item_i):</strong></p>
+                            <ol>
+                                <li>Compute the average rating across raters separately for each feature</li>
+                            </ol>
+                            <p>Now for each of the 60 items, you have one rating (the avg rating) per feature.</p>
+                            <p><strong>For each pair of items (item_i, item_j):</strong></p>
+                            <ol>
+                                <li>Correlate the feature ratings for (item_i, item_j) across features</li>                                
+                            </ol>
+                            <p><strong>High correlation = confusable items (your features don't distinguish between items)</strong></p>
+                            <p>This could reveal a limitation of the stimulus set (items are too similar), or your features (need more fine-grained features).</p>
+                        </div>
+                    </details>
+
+                    <div class="note">
+                        <strong>Why does this matter?</strong>
+                        <ul>
+                            <li>High item similarity means "according to your features" the brain responses will be highly similar (this could be right!)</li>
+                            <li>But, if in fact the brain distinguishes these items (at least in some regions) very high similarity scores could indicate you are missing key features.</li>
+                            <li>Low scores (on at least some features) suggest your item set has good coverage</li>
+                            <li>Goal: Diverse items with distinct feature profiles</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div id="similarityAnalysis">
+                    <button id="computeSimilarityBtn" class="btn-primary">Compute Item Similarity</button>
+
+                    <div id="similarityLoading" class="loading-message" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Computing item-vs-item correlations...</p>
+                    </div>
+
+                    <div id="similarityResults" style="display: none;">
+                        <div class="results-header">
+                            <h3>Item Similarity Results</h3>
+                        </div>
+
+                        <!-- Summary Statistics -->
+                        <div id="similaritySummary" class="data-summary"></div>
+
+                        <!-- Heatmap -->
+                        <div class="heatmap-section">
+                            <h4>Item-vs-Item Correlation Heatmap</h4>
+                            <div class="results-header">
+                                <p class="explanation-text">
+                                    Shows correlation between each pair of items (averaged feature ratings across all raters).
+                                    Darker red = items are very similar. Darker blue = items are very different.
+                                </p>
+                                <button id="downloadSimilarityHeatmap" class="btn-download">Download Heatmap (PNG)</button>
+                            </div>
+                            <div id="similarityHeatmap" class="plotly-heatmap"></div>
+                        </div>
+
+                        <!-- Threshold Control -->
+                        <div class="threshold-control">
+                            <label for="similarityThreshold">
+                                Similarity Threshold: <span id="similarityThresholdValue">0.70</span>
+                            </label>
+                            <input
+                                type="range"
+                                id="similarityThreshold"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value="0.7"
+                            >
+                            <p class="explanation-text">
+                                Adjust the threshold to see which item pairs are above it.
+                                Higher values (≥0.7) indicate confusable items that may limit prediction performance.
+                            </p>
+                        </div>
+
+                        <!-- Bar Chart -->
+                        <div class="chart-section">
+                            <h4>Item Pairs Above Threshold</h4>
+                            <div class="results-header">
+                                <p class="explanation-text">
+                                    Item pairs with correlation above the threshold, sorted from most to least similar.
+                                </p>
+                                <button id="downloadSimilarityChart" class="btn-download">Download Chart (PNG)</button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="similarityChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Most Similar Pairs -->
+                        <div class="chart-section">
+                            <h4>Most Similar Item Pairs</h4>
+                            <p class="explanation-text">
+                                Item pairs sorted by correlation (highest first). These items have the most similar feature profiles.
+                            </p>
+                            <details class="data-table-section">
+                                <summary>View Top 20 Most Similar Pairs</summary>
+                                <div id="similarityTable"></div>
+                            </details>
+                        </div>
+
+                        <div class="interpretation">
+                            <h4>Interpretation Guide:</h4>
+                            <ul>
+                                <li><strong>r &gt; 0.8:</strong> Very similar items - nearly identical feature profiles</li>
+                                <li><strong>r = 0.6-0.8:</strong> Moderately similar - some overlap in features</li>
+                                <li><strong>r = 0.4-0.6:</strong> Somewhat similar - some shared properties</li>
+                                <li><strong>r &lt; 0.4:</strong> Distinct items - good diversity</li>
+                                <li><strong>High overall similarity:</strong> Indicates limited coverage of feature space</li>
+                                <li><strong>Low overall similarity:</strong> Indicates good stimulus diversity</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="step-navigation">
                     <button id="step5Prev" class="btn-prev">← Previous</button>
-                    <button id="step5Next" class="btn-next">Next →</button>
+                    <button id="step5Next" class="btn-next" disabled>Next: Decisions →</button>
                 </div>
             </div>
         </section>

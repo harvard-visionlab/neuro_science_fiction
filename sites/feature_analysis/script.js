@@ -19,7 +19,10 @@ let appState = {
     agreementHeatmap: null,
     redundancyResults: null,
     redundancyChart: null,
-    redundancyThresholdValue: 0.7
+    redundancyThresholdValue: 0.7,
+    similarityResults: null,
+    similarityChart: null,
+    similarityThresholdValue: 0.7
 };
 
 // DOM Elements - Step 1
@@ -55,6 +58,16 @@ const redundancyThresholdValue = document.getElementById('redundancyThresholdVal
 const downloadRedundancyHeatmap = document.getElementById('downloadRedundancyHeatmap');
 const downloadRedundancyChart = document.getElementById('downloadRedundancyChart');
 
+// DOM Elements - Step 5
+const computeSimilarityBtn = document.getElementById('computeSimilarityBtn');
+const similarityLoading = document.getElementById('similarityLoading');
+const similarityResults = document.getElementById('similarityResults');
+const step5Next = document.getElementById('step5Next');
+const similarityThreshold = document.getElementById('similarityThreshold');
+const similarityThresholdValue = document.getElementById('similarityThresholdValue');
+const downloadSimilarityHeatmap = document.getElementById('downloadSimilarityHeatmap');
+const downloadSimilarityChart = document.getElementById('downloadSimilarityChart');
+
 // Initialize app
 function init() {
     setupEventListeners();
@@ -83,6 +96,13 @@ function setupEventListeners() {
     downloadRedundancyHeatmap.addEventListener('click', handleDownloadRedundancyHeatmap);
     downloadRedundancyChart.addEventListener('click', handleDownloadRedundancyChart);
     step4Next.addEventListener('click', () => navigateToStep(5));
+
+    // Step 5
+    computeSimilarityBtn.addEventListener('click', handleComputeSimilarity);
+    similarityThreshold.addEventListener('input', handleSimilarityThresholdChange);
+    downloadSimilarityHeatmap.addEventListener('click', handleDownloadSimilarityHeatmap);
+    downloadSimilarityChart.addEventListener('click', handleDownloadSimilarityChart);
+    step5Next.addEventListener('click', () => navigateToStep(6));
 
     // Navigation buttons for other steps
     document.getElementById('step2Prev').addEventListener('click', () => navigateToStep(1));
@@ -1151,6 +1171,393 @@ function handleDownloadRedundancyChart() {
     const canvas = document.getElementById('redundancyChart');
     const link = document.createElement('a');
     link.download = `${appState.year}_${appState.groupName}_feature_redundancy_chart.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+// Step 5: Item Similarity
+async function handleComputeSimilarity() {
+    if (!appState.df) {
+        alert('Please complete Step 1 (Load Data) first');
+        return;
+    }
+
+    // Show loading
+    similarityLoading.style.display = 'block';
+    similarityResults.style.display = 'none';
+    computeSimilarityBtn.disabled = true;
+
+    // Use setTimeout to allow UI to update
+    setTimeout(() => {
+        try {
+            // Compute item similarity
+            const { itemVsItem } = computeItemVsItemCorr(appState.df);
+            const items = appState.df.unique('itemName');
+
+            // Compute pairwise correlations
+            const pairs = [];
+            for (let i = 0; i < items.length - 1; i++) {
+                for (let j = i + 1; j < items.length; j++) {
+                    const corr = itemVsItem[i][j];
+                    pairs.push({
+                        item1: items[i],
+                        item2: items[j],
+                        pair: `${items[i]} vs ${items[j]}`,
+                        correlation: corr,
+                        absCorrelation: Math.abs(corr)
+                    });
+                }
+            }
+
+            // Sort by absolute correlation descending
+            pairs.sort((a, b) => {
+                if (isNaN(a.absCorrelation) && isNaN(b.absCorrelation)) return 0;
+                if (isNaN(a.absCorrelation)) return 1;
+                if (isNaN(b.absCorrelation)) return -1;
+                return b.absCorrelation - a.absCorrelation;
+            });
+
+            // Store results
+            appState.similarityResults = {
+                itemVsItem: itemVsItem,
+                pairs: pairs,
+                items: items
+            };
+
+            // Display results
+            displaySimilarityResults();
+
+            // Show results
+            similarityLoading.style.display = 'none';
+            similarityResults.style.display = 'block';
+
+            // Enable next button
+            step5Next.disabled = false;
+
+        } catch (error) {
+            console.error('Error computing similarity:', error);
+            alert(`Error computing similarity: ${error.message}`);
+            similarityLoading.style.display = 'none';
+            computeSimilarityBtn.disabled = false;
+        }
+    }, 100);
+}
+
+function displaySimilarityResults() {
+    // Create heatmap
+    createSimilarityHeatmap();
+
+    // Create bar chart (with threshold)
+    createSimilarityChart();
+
+    // Create summary
+    updateSimilaritySummary();
+
+    // Create detailed table
+    createSimilarityTable();
+}
+
+function createSimilarityHeatmap() {
+    const { itemVsItem, items } = appState.similarityResults;
+
+    // Filter out items with all NaN values (except self-correlation)
+    const validItemIndices = [];
+    const validItems = [];
+
+    for (let i = 0; i < items.length; i++) {
+        // Check if this item has at least some valid correlations with OTHER items
+        let hasValidData = false;
+        for (let j = 0; j < items.length; j++) {
+            if (i !== j && !isNaN(itemVsItem[i][j])) {
+                hasValidData = true;
+                break;
+            }
+        }
+        if (hasValidData) {
+            validItemIndices.push(i);
+            validItems.push(items[i]);
+        }
+    }
+
+    // Create filtered matrix
+    const filteredMatrix = [];
+    for (let i of validItemIndices) {
+        const row = [];
+        for (let j of validItemIndices) {
+            row.push(itemVsItem[i][j]);
+        }
+        filteredMatrix.push(row);
+    }
+
+    // Custom colorscale: Blue (-1) → Black (0) → Red (+1)
+    const customColorscale = [
+        [0.0, 'rgb(0, 0, 255)'],      // -1.0: Blue
+        [0.25, 'rgb(100, 100, 200)'], // -0.5: Light blue
+        [0.5, 'rgb(0, 0, 0)'],        //  0.0: Black
+        [0.75, 'rgb(200, 100, 100)'], //  0.5: Light red
+        [1.0, 'rgb(255, 0, 0)']       //  1.0: Red
+    ];
+
+    const data = [{
+        z: filteredMatrix,
+        x: validItems,
+        y: validItems,
+        type: 'heatmap',
+        colorscale: customColorscale,
+        zmid: 0,
+        zmin: -1,
+        zmax: 1,
+        colorbar: {
+            title: 'Correlation',
+            titleside: 'right'
+        },
+        hovertemplate: '%{y} vs %{x}<br>Correlation: %{z:.3f}<extra></extra>'
+    }];
+
+    const layout = {
+        title: 'Item-vs-Item Correlation Heatmap',
+        xaxis: {
+            title: 'Items',
+            tickangle: -45,
+            side: 'bottom'
+        },
+        yaxis: {
+            title: 'Items',
+            autorange: 'reversed'
+        },
+        width: 800,
+        height: 800,
+        margin: { l: 150, r: 100, t: 80, b: 150 }
+    };
+
+    const config = {
+        responsive: true,
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+    };
+
+    Plotly.newPlot('similarityHeatmap', data, layout, config);
+}
+
+function updateSimilaritySummary() {
+    const summaryDiv = document.getElementById('similaritySummary');
+    const { pairs } = appState.similarityResults;
+    const threshold = appState.similarityThresholdValue;
+
+    // Filter out NaN pairs for statistics
+    const validPairs = pairs.filter(p => !isNaN(p.absCorrelation));
+    const avgCorr = validPairs.length > 0
+        ? validPairs.reduce((sum, p) => sum + p.absCorrelation, 0) / validPairs.length
+        : 0;
+    const aboveThresholdPairs = validPairs.filter(p => p.absCorrelation >= threshold);
+    const veryHighPairs = validPairs.filter(p => p.absCorrelation >= 0.9);
+
+    let html = '<h3>Summary</h3>';
+    html += '<div class="summary-grid">';
+    html += `<div class="summary-item">
+        <div class="summary-label">Total Item Pairs:</div>
+        <div class="summary-value">${pairs.length}</div>
+    </div>`;
+    html += `<div class="summary-item">
+        <div class="summary-label">Average |Correlation|:</div>
+        <div class="summary-value">${avgCorr.toFixed(3)}</div>
+    </div>`;
+    html += `<div class="summary-item">
+        <div class="summary-label">Above Threshold (${threshold.toFixed(2)}):</div>
+        <div class="summary-value">${aboveThresholdPairs.length}</div>
+    </div>`;
+    html += `<div class="summary-item">
+        <div class="summary-label">Very High (≥ 0.9):</div>
+        <div class="summary-value" style="color: #dc3545;">${veryHighPairs.length}</div>
+    </div>`;
+    html += '</div>';
+
+    if (veryHighPairs.length > 0) {
+        html += '<div class="note" style="margin-top: 20px;">';
+        html += '<strong>⚠️ Note:</strong> You have ' + veryHighPairs.length + ' item pair(s) with very high similarity (≥ 0.9). ';
+        html += 'This suggests some items may be confusable, which can limit prediction performance. ';
+        html += 'This could be a limitation of your item set — Perhaps the brain responses are in fact indistinguishable. ';
+        html += 'Alternatively, this could be a limitation of your feature set (you need to choose features that better distinguish the items).';
+        html += '</div>';
+    }
+
+    summaryDiv.innerHTML = html;
+}
+
+function createSimilarityTable() {
+    const tableDiv = document.getElementById('similarityTable');
+    const { pairs } = appState.similarityResults;
+
+    // Show top 20 most similar pairs
+    const topPairs = pairs.slice(0, 20);
+
+    let html = '<h4>Top 20 Most Similar Item Pairs</h4>';
+    html += '<table><thead><tr>';
+    html += '<th>Rank</th>';
+    html += '<th>Item 1</th>';
+    html += '<th>Item 2</th>';
+    html += '<th>Correlation</th>';
+    html += '<th>|Correlation|</th>';
+    html += '<th>Similarity</th>';
+    html += '</tr></thead><tbody>';
+
+    topPairs.forEach((pair, index) => {
+        let quality = '';
+        let corrDisplay = '';
+        let absCorrDisplay = '';
+        let rowClass = '';
+
+        if (isNaN(pair.correlation)) {
+            corrDisplay = 'NaN';
+            absCorrDisplay = 'NaN';
+            quality = '—';  // Em dash for no data
+            rowClass = 'row-warning';
+        } else {
+            corrDisplay = pair.correlation.toFixed(3);
+            absCorrDisplay = pair.absCorrelation.toFixed(3);
+
+            if (pair.absCorrelation >= 0.9) {
+                quality = 'Very High';
+                rowClass = 'row-redundant';
+            } else if (pair.absCorrelation >= 0.8) {
+                quality = 'High';
+                rowClass = 'row-warning';
+            } else if (pair.absCorrelation >= 0.7) {
+                quality = 'Moderate';
+            } else if (pair.absCorrelation >= 0.5) {
+                quality = 'Low';
+            } else {
+                quality = 'Very Low';
+            }
+        }
+
+        html += `<tr class="${rowClass}">`;
+        html += `<td>${index + 1}</td>`;
+        html += `<td>${pair.item1}</td>`;
+        html += `<td>${pair.item2}</td>`;
+        html += `<td>${corrDisplay}</td>`;
+        html += `<td>${absCorrDisplay}</td>`;
+        html += `<td>${quality}</td>`;
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    tableDiv.innerHTML = html;
+}
+
+function createSimilarityChart() {
+    const { pairs } = appState.similarityResults;
+    const threshold = appState.similarityThresholdValue;
+
+    // Filter pairs above threshold and sort by absolute correlation (highest first)
+    const filteredPairs = pairs
+        .filter(p => !isNaN(p.absCorrelation) && p.absCorrelation >= threshold)
+        .sort((a, b) => b.absCorrelation - a.absCorrelation);
+
+    // Destroy existing chart if it exists
+    if (appState.similarityChart) {
+        appState.similarityChart.destroy();
+    }
+
+    // If no pairs above threshold, show message
+    if (filteredPairs.length === 0) {
+        const canvas = document.getElementById('similarityChart');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = '16px Arial';
+        ctx.fillStyle = '#666';
+        ctx.textAlign = 'center';
+        ctx.fillText('No item pairs above threshold', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    // Create bar chart
+    const ctx = document.getElementById('similarityChart').getContext('2d');
+    appState.similarityChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: filteredPairs.map(p => p.pair),
+            datasets: [{
+                label: 'Absolute Correlation',
+                data: filteredPairs.map(p => p.absCorrelation),
+                backgroundColor: filteredPairs.map(p => {
+                    if (p.absCorrelation >= 0.9) return 'rgba(220, 53, 69, 0.8)';
+                    if (p.absCorrelation >= 0.8) return 'rgba(255, 193, 7, 0.8)';
+                    return 'rgba(33, 150, 243, 0.8)';
+                }),
+                borderColor: filteredPairs.map(p => {
+                    if (p.absCorrelation >= 0.9) return 'rgb(220, 53, 69)';
+                    if (p.absCorrelation >= 0.8) return 'rgb(255, 193, 7)';
+                    return 'rgb(33, 150, 243)';
+                }),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `Item Pairs with |Correlation| ≥ ${threshold.toFixed(2)}`
+                },
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `|Correlation|: ${context.parsed.x.toFixed(3)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    max: 1,
+                    title: {
+                        display: true,
+                        text: 'Absolute Correlation'
+                    }
+                },
+                y: {
+                    ticks: {
+                        autoSkip: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+function handleSimilarityThresholdChange(event) {
+    const newThreshold = parseFloat(event.target.value);
+    appState.similarityThresholdValue = newThreshold;
+    similarityThresholdValue.textContent = newThreshold.toFixed(2);
+
+    // Update chart and summary if results exist
+    if (appState.similarityResults) {
+        createSimilarityChart();
+        updateSimilaritySummary();
+    }
+}
+
+function handleDownloadSimilarityHeatmap() {
+    Plotly.downloadImage('similarityHeatmap', {
+        format: 'png',
+        width: 1000,
+        height: 1000,
+        filename: `${appState.year}_${appState.groupName}_item_similarity_heatmap`
+    });
+}
+
+function handleDownloadSimilarityChart() {
+    const canvas = document.getElementById('similarityChart');
+    const link = document.createElement('a');
+    link.download = `${appState.year}_${appState.groupName}_item_similarity_chart.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
 }

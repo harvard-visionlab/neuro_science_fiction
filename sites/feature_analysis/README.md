@@ -8,18 +8,30 @@ This tool converts the Python/Jupyter notebook workflow (`2022/analyze_my_featur
 
 ## Features
 
-### Current (MVP - Phase 1)
+### Current (MVP - Phase 1-4)
 - ✅ **Step 1: Data Loading** - Load ratings from Lambda CSV endpoint
 - ✅ **Step 2: Feature Reliability** - Analyze inter-rater agreement for each feature
   - Interactive bar chart visualization
   - Downloadable charts (PNG format)
   - Data table with quality ratings
   - Color-coded reliability indicators
+- ✅ **Step 3: Rater Agreement** - Analyze how well each rater correlates with others
+  - Interactive Plotly heatmap
+  - Per-rater agreement table
+  - Zero-variance feature detection
+  - Downloadable heatmap
+- ✅ **Step 4: Feature Redundancy** - Identify highly correlated features
+  - Interactive heatmap with black-centered colorscale
+  - Bar chart with adjustable threshold
+  - Detailed redundancy table
+  - Downloadable charts
+- ✅ **Step 5: Item Similarity** - Identify confusable items
+  - Interactive heatmap showing item-vs-item correlation
+  - Summary statistics
+  - Top 20 most similar pairs table
+  - Downloadable heatmap
 
-### Coming Soon (Phase 2-4)
-- 🔲 **Step 3: Rater Agreement** - Analyze how well each rater correlates with others
-- 🔲 **Step 4: Feature Redundancy** - Identify highly correlated features
-- 🔲 **Step 5: Item Similarity** - Identify confusable items
+### Coming Soon (Phase 5)
 - 🔲 **Step 6: Decision Making** - Interactive feature/rater selection
 
 ## How to Use
@@ -42,6 +54,27 @@ This tool converts the Python/Jupyter notebook workflow (`2022/analyze_my_featur
    - Review the horizontal bar chart (features sorted from worst to best)
    - Download the chart for your lab report
    - Examine the data table for detailed statistics
+
+4. **Analyze Rater Agreement** (Step 3)
+   - Click "Compute Rater Agreement"
+   - Review the heatmap showing rater-vs-rater correlations
+   - Check the per-rater agreement table
+   - Note any zero-variance features that are flagged
+   - Download the heatmap for your lab report
+
+5. **Analyze Feature Redundancy** (Step 4)
+   - Click "Compute Feature Redundancy"
+   - Review the heatmap showing feature-vs-feature correlations
+   - Adjust the threshold slider to identify redundant pairs
+   - Examine the bar chart and detailed table
+   - Download visualizations for your lab report
+
+6. **Analyze Item Similarity** (Step 5)
+   - Click "Compute Item Similarity"
+   - Review the heatmap showing item-vs-item correlations
+   - Check summary statistics for overall similarity
+   - Examine the top 20 most similar item pairs
+   - Download the heatmap for your lab report
 
 ### Understanding the Results
 
@@ -83,6 +116,43 @@ This tool converts the Python/Jupyter notebook workflow (`2022/analyze_my_featur
 
 **Note on NaN values:** If a feature has zero variance (all raters gave identical ratings for all items), correlation cannot be computed and returns NaN. These are automatically excluded from average calculations using `nanmean()`, so your overall rater agreement scores are still valid.
 
+#### Feature Redundancy
+
+**What it measures:** How strongly features correlate with each other. Highly correlated features are redundant and can cause multicollinearity problems in regression models.
+
+**Method:** For each item, compute the average rating across all raters for each feature. Then correlate these average ratings across items to get feature-vs-feature correlations.
+
+**Interpretation:**
+- **|r| > 0.9** (Very High): Extremely redundant - one feature can likely be dropped
+- **|r| = 0.7-0.9** (Moderate): Some redundancy - consider which is more reliable
+- **|r| = 0.5-0.7** (Low): Acceptable correlation - features capture somewhat related concepts
+- **|r| < 0.5** (Independent): Features measure distinct properties
+
+**What to do:**
+- Consider dropping one feature from pairs with |r| ≥ 0.9
+- For redundant pairs, keep the feature with higher inter-rater reliability
+- Some correlation is expected for semantically related features
+- Use the threshold slider to explore different redundancy levels
+
+#### Item Similarity
+
+**What it measures:** How similar items are in their feature profiles. High similarity means items are confusable and harder to distinguish.
+
+**Method:** For each feature, compute the average rating across all raters for each item. Then correlate these average ratings across features to get item-vs-item correlations.
+
+**Interpretation:**
+- **|r| > 0.8** (Very High): Nearly identical feature profiles - items are very confusable
+- **|r| = 0.6-0.8** (Moderate): Some overlap in features - moderately similar
+- **|r| = 0.4-0.6** (Low): Some shared properties but mostly distinct
+- **|r| < 0.4** (Very Low): Distinct items with different feature profiles (ideal)
+
+**What to do:**
+- High overall similarity indicates limited coverage of feature space
+- This reveals limitations of your item set, not your features
+- Consider whether highly similar items (≥0.8) are necessary
+- Aim for diverse items with distinct feature profiles
+- High item similarity may limit ceiling performance of prediction models
+
 ### LLM (Surrogate) Raters
 
 Your dataset may include ratings from both humans and LLM models (e.g., GPT-5, Gemini-2.5-Flash). These are automatically detected and labeled.
@@ -98,7 +168,7 @@ Your dataset may include ratings from both humans and LLM models (e.g., GPT-5, G
 ### Architecture
 
 - **Frontend:** Pure HTML, CSS, JavaScript (no frameworks)
-- **Charts:** Chart.js v4.4.0
+- **Charts:** Chart.js v4.4.0 (bar charts) + Plotly.js (heatmaps)
 - **CSV Parsing:** PapaParse v5.4.1
 - **Data Source:** AWS Lambda CSV endpoint
 - **Statistics:** Custom JavaScript implementations
@@ -171,18 +241,21 @@ See `CLAUDE.md` for the full implementation plan and roadmap for adding addition
 
 - Original analysis: `2022/analyze_my_features.ipynb`
 - Lambda backend: AWS Lambda functions
-- Chart library: Chart.js (https://www.chartjs.org/)
+- Chart libraries:
+  - Chart.js (https://www.chartjs.org/)
+  - Plotly.js (https://plotly.com/javascript/)
 - CSV parser: PapaParse (https://www.papaparse.com/)
 
 ## Next Steps
 
 After analyzing your features:
-1. Identify features with poor reliability
-2. Review feature definitions
-3. Consider re-rating or dropping problematic features
-4. Proceed with rater agreement analysis (coming soon)
-5. Continue through all 6 analysis steps
-6. Make final decisions about which features/raters to use
+1. **Step 2:** Identify features with poor reliability (<0.5)
+2. **Step 3:** Identify raters with low agreement (<0.3)
+3. **Step 3:** Review zero-variance features that should be removed
+4. **Step 4:** Identify highly redundant feature pairs (≥0.9)
+5. **Step 5:** Assess overall item diversity and confusability
+6. **Step 6 (Coming Soon):** Make final decisions about which features/raters to keep
+7. Use cleaned dataset for brain prediction models
 
 ## Support
 
@@ -193,6 +266,6 @@ For questions or issues:
 
 ---
 
-**Status:** MVP Phase 1 Complete ✅
-**Last Updated:** 2025
-**Version:** 1.0.0
+**Status:** Steps 1-5 Complete ✅ | Step 6 In Progress 🚧
+**Last Updated:** 2025-10-22
+**Version:** 2.0.0
