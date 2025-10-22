@@ -14,7 +14,9 @@ let appState = {
     currentStep: 1,
     ratingsByFeature: null,
     reliabilityResults: null,
-    reliabilityChart: null
+    reliabilityChart: null,
+    agreementResults: null,
+    agreementHeatmap: null
 };
 
 // DOM Elements - Step 1
@@ -33,6 +35,13 @@ const reliabilityResults = document.getElementById('reliabilityResults');
 const step2Next = document.getElementById('step2Next');
 const downloadReliabilityChart = document.getElementById('downloadReliabilityChart');
 
+// DOM Elements - Step 3
+const computeAgreementBtn = document.getElementById('computeAgreementBtn');
+const agreementLoading = document.getElementById('agreementLoading');
+const agreementResults = document.getElementById('agreementResults');
+const step3Next = document.getElementById('step3Next');
+const downloadAgreementChart = document.getElementById('downloadAgreementChart');
+
 // Initialize app
 function init() {
     setupEventListeners();
@@ -50,10 +59,13 @@ function setupEventListeners() {
     downloadReliabilityChart.addEventListener('click', handleDownloadReliabilityChart);
     step2Next.addEventListener('click', () => navigateToStep(3));
 
+    // Step 3
+    computeAgreementBtn.addEventListener('click', handleComputeAgreement);
+    downloadAgreementChart.addEventListener('click', handleDownloadAgreementChart);
+    step3Next.addEventListener('click', () => navigateToStep(4));
+
     // Navigation buttons for other steps
     document.getElementById('step2Prev').addEventListener('click', () => navigateToStep(1));
-    document.getElementById('step3Prev').addEventListener('click', () => navigateToStep(2));
-    document.getElementById('step3Next').addEventListener('click', () => navigateToStep(4));
     document.getElementById('step4Prev').addEventListener('click', () => navigateToStep(3));
     document.getElementById('step4Next').addEventListener('click', () => navigateToStep(5));
     document.getElementById('step5Prev').addEventListener('click', () => navigateToStep(4));
@@ -484,6 +496,261 @@ function handleDownloadReliabilityChart() {
     link.download = `${appState.year}_${appState.groupName}_feature_reliability.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
+}
+
+// Step 3: Rater Agreement
+async function handleComputeAgreement() {
+    if (!appState.df || !appState.ratingsByFeature) {
+        alert('Please complete Step 2 (Feature Reliability) first');
+        return;
+    }
+
+    // Show loading
+    agreementLoading.style.display = 'block';
+    agreementResults.style.display = 'none';
+    computeAgreementBtn.disabled = true;
+
+    // Use setTimeout to allow UI to update
+    setTimeout(() => {
+        try {
+            // Compute rater agreement
+            const { results, raterVsRaterAll } = computeRaterAgreement(appState.df, appState.ratingsByFeature);
+
+            // Average the correlation matrices across features
+            const avgMatrix = averageMatrices(raterVsRaterAll);
+
+            // Get raters
+            const raters = appState.df.unique('workerId');
+
+            // Calculate average agreement per rater (NaN values are filtered via nanmean)
+            const raterSummary = {};
+            raters.forEach(rater => {
+                const raterResults = results.filter(r => r.rater === rater);
+                const avgAgreement = nanmean(raterResults.map(r => r.avgCorr));
+                raterSummary[rater] = avgAgreement;
+            });
+
+            // Identify features with zero variance (all NaN for all raters)
+            const features = appState.df.unique('featureName');
+            const zeroVarianceFeatures = [];
+            features.forEach(feature => {
+                const featureResults = results.filter(r => r.featureName === feature);
+                const allNaN = featureResults.every(r => isNaN(r.avgCorr));
+                if (allNaN) {
+                    zeroVarianceFeatures.push(feature);
+                }
+            });
+
+            // Store results
+            appState.agreementResults = {
+                results: results,
+                avgMatrix: avgMatrix,
+                raters: raters,
+                raterSummary: raterSummary,
+                zeroVarianceFeatures: zeroVarianceFeatures
+            };
+
+            // Display results
+            displayAgreementResults();
+
+            // Show results
+            agreementLoading.style.display = 'none';
+            agreementResults.style.display = 'block';
+
+            // Enable next button
+            step3Next.disabled = false;
+
+        } catch (error) {
+            console.error('Error computing agreement:', error);
+            alert(`Error computing agreement: ${error.message}`);
+            agreementLoading.style.display = 'none';
+            computeAgreementBtn.disabled = false;
+        }
+    }, 100);
+}
+
+function displayAgreementResults() {
+    // Show warning about zero-variance features if any
+    showZeroVarianceWarning();
+
+    // Create summary table
+    createAgreementSummaryTable();
+
+    // Create heatmap
+    createAgreementHeatmap();
+
+    // Create detailed table
+    createAgreementDetailTable();
+}
+
+function showZeroVarianceWarning() {
+    const { zeroVarianceFeatures } = appState.agreementResults;
+
+    // Find or create warning div (insert after the compute button)
+    let warningDiv = document.getElementById('zeroVarianceWarning');
+    if (!warningDiv) {
+        warningDiv = document.createElement('div');
+        warningDiv.id = 'zeroVarianceWarning';
+        warningDiv.className = 'note';
+        warningDiv.style.marginTop = '20px';
+        document.getElementById('agreementResults').prepend(warningDiv);
+    }
+
+    if (zeroVarianceFeatures.length > 0) {
+        warningDiv.style.display = 'block';
+        warningDiv.innerHTML = `
+            <strong>⚠️ Zero-Variance Features Detected:</strong><br>
+            The following ${zeroVarianceFeatures.length} feature(s) have zero variance (all raters gave identical ratings for all items).
+            These features produce NaN correlation values and are excluded from the average agreement calculations:<br>
+            <ul style="margin-top: 10px; margin-left: 20px;">
+                ${zeroVarianceFeatures.map(f => `<li><code>${f}</code></li>`).join('')}
+            </ul>
+            These features don't discriminate between items and should likely be removed from your feature set.
+        `;
+    } else {
+        warningDiv.style.display = 'none';
+    }
+}
+
+function createAgreementSummaryTable() {
+    const tableDiv = document.getElementById('agreementSummaryTable');
+    const { raters, raterSummary } = appState.agreementResults;
+
+    // Sort raters by average agreement (ascending)
+    const sortedRaters = raters.slice().sort((a, b) => raterSummary[a] - raterSummary[b]);
+
+    let html = '<table><thead><tr>';
+    html += '<th>Rank</th>';
+    html += '<th>Rater</th>';
+    html += '<th>Type</th>';
+    html += '<th>Avg Agreement</th>';
+    html += '<th>Quality</th>';
+    html += '</tr></thead><tbody>';
+
+    sortedRaters.forEach((rater, index) => {
+        const avgCorr = raterSummary[rater];
+        const raterType = categorizeRater(rater);
+        const typeClass = raterType === 'LLM' ? 'llm' : 'human';
+
+        let quality = '';
+        let corrDisplay = '';
+
+        if (isNaN(avgCorr)) {
+            quality = 'No Variance';
+            corrDisplay = 'NaN';
+        } else {
+            corrDisplay = avgCorr.toFixed(3);
+            if (avgCorr >= 0.7) quality = 'Excellent';
+            else if (avgCorr >= 0.5) quality = 'Good';
+            else if (avgCorr >= 0.3) quality = 'Fair';
+            else quality = 'Poor';
+        }
+
+        html += '<tr>';
+        html += `<td>${index + 1}</td>`;
+        html += `<td>${rater}</td>`;
+        html += `<td><span class="rater-type ${typeClass}">${raterType}</span></td>`;
+        html += `<td>${corrDisplay}</td>`;
+        html += `<td>${quality}</td>`;
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    tableDiv.innerHTML = html;
+}
+
+function createAgreementHeatmap() {
+    const { avgMatrix, raters } = appState.agreementResults;
+
+    // Create heatmap data in Plotly format
+    const data = [{
+        z: avgMatrix,
+        x: raters,
+        y: raters,
+        type: 'heatmap',
+        colorscale: 'RdBu',  // Red-Blue colorscale
+        reversescale: false,  // Blue=low (negative correlation), Red=high (positive correlation)
+        zmin: -1,
+        zmax: 1,
+        hoverongaps: false,
+        hovertemplate: '%{y} vs %{x}<br>Correlation: %{z:.3f}<extra></extra>',
+        colorbar: {
+            title: 'Correlation',
+            titleside: 'right',
+            tickmode: 'linear',
+            tick0: -1,
+            dtick: 0.5
+        }
+    }];
+
+    const layout = {
+        xaxis: {
+            title: '',
+            side: 'bottom',
+            tickangle: -45
+        },
+        yaxis: {
+            title: '',
+            autorange: 'reversed'  // Y-axis top to bottom
+        },
+        width: 700,
+        height: 700,
+        margin: { l: 150, r: 100, t: 50, b: 150 }
+    };
+
+    const config = {
+        responsive: true,
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d']
+    };
+
+    Plotly.newPlot('agreementHeatmap', data, layout, config);
+    appState.agreementHeatmap = true;
+}
+
+function createAgreementDetailTable() {
+    const tableDiv = document.getElementById('agreementDetailTable');
+    const { results, zeroVarianceFeatures } = appState.agreementResults;
+
+    // Filter out NaN results (zero-variance features)
+    const validResults = results.filter(row => !isNaN(row.avgCorr));
+    const nanCount = results.length - validResults.length;
+
+    let html = '';
+
+    if (nanCount > 0) {
+        html += `<p class="explanation-text" style="margin-bottom: 15px;">
+            <strong>Note:</strong> Showing ${validResults.length} valid results.
+            ${nanCount} NaN values (from ${zeroVarianceFeatures.length} zero-variance features) are hidden.
+        </p>`;
+    }
+
+    html += '<table><thead><tr>';
+    html += '<th>Feature</th>';
+    html += '<th>Rater</th>';
+    html += '<th>Avg Correlation</th>';
+    html += '</tr></thead><tbody>';
+
+    validResults.forEach(row => {
+        html += '<tr>';
+        html += `<td>${row.featureName}</td>`;
+        html += `<td>${row.rater}</td>`;
+        html += `<td>${row.avgCorr.toFixed(3)}</td>`;
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    tableDiv.innerHTML = html;
+}
+
+function handleDownloadAgreementChart() {
+    Plotly.downloadImage('agreementHeatmap', {
+        format: 'png',
+        width: 1000,
+        height: 1000,
+        filename: `${appState.year}_${appState.groupName}_rater_agreement`
+    });
 }
 
 // Initialize app when DOM is ready

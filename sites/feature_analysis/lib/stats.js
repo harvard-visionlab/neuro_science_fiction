@@ -109,11 +109,17 @@ function absMatrix(matrix) {
 }
 
 // Sort features by consistency (average inter-rater correlation)
+// This is "Feature Reliability" or "Inter-rater Agreement" per feature
+// For each feature:
+//   - ratings[i] is an array of N item ratings for rater i
+//   - corrcoef(ratings) computes NxN correlation matrix between raters
+//   - Each correlation is based on N-item vectors (e.g., 60 items)
+//   - We average the upper triangle to get overall feature reliability
 function sortFeaturesByConsistency(ratingsByFeature) {
     const results = [];
 
     Object.entries(ratingsByFeature).forEach(([featureName, ratings]) => {
-        const raterVsRater = corrcoef(ratings);
+        const raterVsRater = corrcoef(ratings);  // NxN matrix where N = number of raters
         const numRaters = raterVsRater.length;
         const upperTriangle = getUpperTriangle(raterVsRater);
         const avgCorr = nanmean(upperTriangle);
@@ -130,19 +136,27 @@ function sortFeaturesByConsistency(ratingsByFeature) {
     return results;
 }
 
-// Compute rater agreement
+// Compute rater agreement (per-rater performance across features)
+// For each feature:
+//   - Compute NxN correlation matrix between raters (same as Feature Reliability)
+//   - For each rater, compute their average correlation with other raters
+// Then across features:
+//   - Average each rater's agreement scores to get overall rater performance
+// Returns:
+//   - results: array of {featureName, rater, avgCorr} for each rater-feature combo
+//   - raterVsRaterAll: array of correlation matrices (one per feature)
 function computeRaterAgreement(df, ratingsByFeature) {
     const raters = df.unique('workerId');
     const results = [];
     const raterVsRaterAll = [];
 
     Object.entries(ratingsByFeature).forEach(([featureName, ratings]) => {
-        const raterVsRater = corrcoef(ratings);
+        const raterVsRater = corrcoef(ratings);  // NxN matrix for this feature
         const numRaters = raterVsRater.length;
 
-        // Calculate consistency for each rater
+        // For each rater, compute their average correlation with all other raters
         for (let raterNum = 0; raterNum < numRaters; raterNum++) {
-            // Average correlation with all other raters
+            // Average correlation with all other raters (excluding self, which is 1.0)
             const correlations = raterVsRater[raterNum];
             const raterConsistency = (correlations.reduce((sum, val) => sum + val, 0) - 1) / (numRaters - 1);
 
@@ -160,6 +174,11 @@ function computeRaterAgreement(df, ratingsByFeature) {
 }
 
 // Average correlation across matrices (for rater agreement heatmap)
+// Takes an array of NxN correlation matrices (one per feature)
+// Returns a single NxN matrix where each cell [i,j] is the average correlation
+// between rater i and rater j across all features
+// Example: If rater1 vs rater2 has correlation 0.8 on "animacy" and 0.6 on "size",
+//          the averaged matrix will have 0.7 at position [1,2]
 function averageMatrices(matrices) {
     if (matrices.length === 0) return [];
 

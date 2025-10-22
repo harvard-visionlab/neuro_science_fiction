@@ -125,19 +125,21 @@
 
                 <div class="explanation">
                     <h3>What is Feature Reliability?</h3>
-                    <p>Feature reliability measures how <strong>consistently</strong> different raters (humans and LLMs) agreed on each feature.</p>
+                    <p><strong>Also known as "Inter-rater Agreement"</strong> in the literature, this measures how consistently different raters (humans and LLMs) agreed on each feature.</p>
 
                     <details>
                         <summary>How does it work?</summary>
                         <div class="explanation-detail">
-                            <p>For each feature, we:</p>
+                            <p><strong>For each feature separately:</strong></p>
                             <ol>
-                                <li>Take ratings from two raters across all items</li>
-                                <li>Calculate the correlation between their ratings</li>
+                                <li>Take all items rated by Rater 1 (e.g., 60 ratings)</li>
+                                <li>Take all items rated by Rater 2 (e.g., 60 ratings)</li>
+                                <li>Correlate these two 60-element vectors</li>
                                 <li>Repeat for all pairs of raters</li>
-                                <li>Average these correlations</li>
+                                <li>Average these pairwise correlations to get reliability for this feature</li>
                             </ol>
-                            <p><strong>Higher values = better reliability</strong> (raters agreed more)</p>
+                            <p><strong>Example:</strong> If you have 60 items and 5 raters, for the feature "animacy" we correlate each rater's 60 item ratings with every other rater's 60 item ratings (10 pairs total), then average those 10 correlations.</p>
+                            <p><strong>Higher values = better reliability</strong> (raters agreed more on this feature)</p>
                             <p>Features with low reliability (&lt; 0.5) may be subjective or poorly defined.</p>
                         </div>
                     </details>
@@ -192,18 +194,102 @@
             </div>
         </section>
 
-        <!-- Step 3: Rater Agreement (Placeholder) -->
+        <!-- Step 3: Rater Agreement -->
         <section class="step-section" id="step3">
             <div class="card">
                 <div class="step-header">
                     <h2>Step 3: Rater Agreement</h2>
                 </div>
+
                 <div class="explanation">
-                    <p><em>Coming soon...</em></p>
+                    <h3>What is Rater Agreement?</h3>
+                    <p>This analysis identifies which raters consistently agree with the group across all features. Unlike Step 2 which evaluates features, this evaluates individual rater performance.</p>
+
+                    <details>
+                        <summary>How does it work?</summary>
+                        <div class="explanation-detail">
+                            <p><strong>For each feature separately:</strong></p>
+                            <ol>
+                                <li>Correlate each rater's item ratings (60 items) with every other rater's item ratings</li>
+                                <li>For each rater, average their correlations with all other raters</li>
+                                <li>This gives each rater an "agreement score" for this feature</li>
+                            </ol>
+                            <p><strong>Then across all features:</strong></p>
+                            <ol start="4">
+                                <li>Average each rater's agreement scores across all features</li>
+                                <li>This gives each rater an overall agreement score</li>
+                            </ol>
+                            <p><strong>Example:</strong> If Rater 1 has 0.8 agreement on "animacy", 0.7 on "size", and 0.6 on "color", their overall agreement is (0.8+0.7+0.6)/3 = 0.70</p>
+                            <p><strong>Higher values = better agreement</strong> with the group consensus</p>
+                            <p>Low-agreement raters may be using different criteria or misunderstanding the task.</p>
+                        </div>
+                    </details>
+
+                    <div class="note">
+                        <strong>Note on LLM vs Human Raters:</strong> LLM models may show different agreement patterns:
+                        <ul>
+                            <li>LLMs with identical prompts may have near-perfect agreement</li>
+                            <li>Different LLM models may disagree systematically</li>
+                            <li>Human raters typically show more natural variation</li>
+                            <li>Low agreement between humans and LLMs isn't necessarily bad - it may reflect different valid perspectives</li>
+                        </ul>
+                    </div>
                 </div>
+
+                <div id="agreementAnalysis">
+                    <button id="computeAgreementBtn" class="btn-primary">Compute Rater Agreement</button>
+
+                    <div id="agreementLoading" class="loading-message" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Computing rater-vs-rater correlations...</p>
+                    </div>
+
+                    <div id="agreementResults" style="display: none;">
+                        <div class="results-header">
+                            <h3>Rater Agreement Results</h3>
+                            <button id="downloadAgreementChart" class="btn-download">Download Heatmap (PNG)</button>
+                        </div>
+
+                        <!-- Average Agreement Table -->
+                        <div class="agreement-summary">
+                            <h4>Average Agreement by Rater</h4>
+                            <p class="explanation-text">This shows how well each rater correlates with all other raters, on average across all features.</p>
+                            <div id="agreementSummaryTable"></div>
+                        </div>
+
+                        <!-- Heatmap -->
+                        <div class="heatmap-section">
+                            <h4>Rater-vs-Rater Correlation Heatmap</h4>
+                            <p class="explanation-text">
+                                Average correlation between each pair of raters across all features.
+                                For each feature, we correlate Rater A's 60 item ratings with Rater B's 60 item ratings,
+                                then average these correlations across all features.
+                            </p>
+                            <div id="agreementHeatmap" class="plotly-heatmap"></div>
+                        </div>
+
+                        <details class="data-table-section">
+                            <summary>View Detailed Data Table</summary>
+                            <div id="agreementDetailTable"></div>
+                        </details>
+
+                        <div class="interpretation">
+                            <h4>Interpretation Guide:</h4>
+                            <ul>
+                                <li><strong>r &gt; 0.7:</strong> Excellent agreement - rater closely aligns with group</li>
+                                <li><strong>r = 0.5-0.7:</strong> Good agreement - reasonable alignment</li>
+                                <li><strong>r = 0.3-0.5:</strong> Fair agreement - some divergence from group</li>
+                                <li><strong>r &lt; 0.3:</strong> Poor agreement - rater may be using different criteria</li>
+                                <li><strong>NaN (zero-variance features):</strong> Features where all raters gave identical ratings for all items. These don't discriminate between items and are automatically excluded from agreement calculations.</li>
+                                <li><strong>Consider dropping raters with consistently low agreement (&lt; 0.3)</strong></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="step-navigation">
                     <button id="step3Prev" class="btn-prev">← Previous</button>
-                    <button id="step3Next" class="btn-next">Next →</button>
+                    <button id="step3Next" class="btn-next" disabled>Next: Feature Redundancy →</button>
                 </div>
             </div>
         </section>
@@ -245,6 +331,7 @@
     <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 
     <!-- Custom Libraries -->
     <script src="lib/dataframe.js"></script>

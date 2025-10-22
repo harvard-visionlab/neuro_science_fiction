@@ -45,9 +45,11 @@ This tool converts the Python/Jupyter notebook workflow (`2022/analyze_my_featur
 
 ### Understanding the Results
 
-#### Feature Reliability
+#### Feature Reliability (Inter-rater Agreement)
 
-**What it measures:** How consistently different raters agreed on each feature.
+**What it measures:** How consistently different raters agreed on each feature. This is the classic "inter-rater agreement" measure from the literature.
+
+**Method:** For each feature, correlate each rater's item ratings (e.g., 60 items) with every other rater's item ratings, then average these pairwise correlations.
 
 **Interpretation:**
 - **r > 0.7** (Green): Excellent reliability - strong agreement
@@ -59,6 +61,27 @@ This tool converts the Python/Jupyter notebook workflow (`2022/analyze_my_featur
 - Features with low reliability (<0.5) may need clearer definitions
 - Consider dropping features with very poor reliability (<0.3)
 - LLM raters may show different consistency patterns than humans
+
+#### Rater Agreement (Per-rater Performance)
+
+**What it measures:** How well each individual rater correlates with the group across all features. Unlike Step 2 which evaluates features, this evaluates rater performance.
+
+**Method:** For each feature, compute each rater's correlation with all other raters, then average across all features to get each rater's overall agreement score.
+
+**Interpretation:**
+- **r > 0.7** (Excellent): Rater closely aligns with group consensus
+- **r = 0.5-0.7** (Good): Reasonable alignment with group
+- **r = 0.3-0.5** (Fair): Some divergence from group
+- **r < 0.3** (Poor): Rater may be using different criteria
+- **NaN (zero variance)**: Features where all raters gave identical ratings are automatically excluded from calculations
+
+**What to do:**
+- Consider dropping raters with consistently low agreement (<0.3)
+- Low agreement between humans and LLMs isn't necessarily bad - may reflect different valid perspectives
+- Review the heatmap to identify clusters of similar raters
+- Zero-variance features (causing NaN) should likely be removed from your feature set
+
+**Note on NaN values:** If a feature has zero variance (all raters gave identical ratings for all items), correlation cannot be computed and returns NaN. These are automatically excluded from average calculations using `nanmean()`, so your overall rater agreement scores are still valid.
 
 ### LLM (Surrogate) Raters
 

@@ -573,6 +573,57 @@ details[open] summary {
     margin-bottom: 8px;
 }
 
+/* Agreement Summary */
+.agreement-summary {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 6px;
+    margin: 20px 0;
+}
+
+.agreement-summary h4 {
+    margin-bottom: 10px;
+}
+
+.explanation-text {
+    font-size: 0.9em;
+    color: #6c757d;
+    margin-bottom: 15px;
+}
+
+#agreementSummaryTable table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    margin-top: 10px;
+}
+
+#agreementSummaryTable th,
+#agreementSummaryTable td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+
+#agreementSummaryTable th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+/* Heatmap Section */
+.heatmap-section {
+    margin: 30px 0;
+}
+
+.heatmap-section h4 {
+    margin-bottom: 10px;
+}
+
+.plotly-heatmap {
+    width: 100%;
+    min-height: 600px;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     body {
