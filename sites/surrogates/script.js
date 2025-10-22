@@ -344,14 +344,16 @@ async function fetchRatingStatus() {
 function displayProgressSummary(data) {
     const { totalFeatures, totalRatings } = data.summary || { totalFeatures: 0, totalWorkers: 0, totalRatings: 0 };
 
-    // Use all available models from dropdown for max possible calculation
+    // Use all available models from dropdown PLUS any workers that have submitted ratings
+    // This matches the logic in displayCompletionTable
     const availableModels = getAvailableModels();
-    const totalAvailableModels = availableModels.length;
-    const maxPossible = totalFeatures * totalAvailableModels;
+    const allWorkers = [...new Set([...availableModels, ...(data.workers || [])])];
+    const totalWorkers = allWorkers.length;
+    const maxPossible = totalFeatures * totalWorkers;
     const percentComplete = maxPossible > 0 ? Math.round((totalRatings / maxPossible) * 100) : 0;
 
     statTotalFeatures.textContent = totalFeatures;
-    statTotalWorkers.textContent = totalAvailableModels;
+    statTotalWorkers.textContent = totalWorkers;
     statTotalRatings.textContent = `${totalRatings}/${maxPossible}`;
     statProgress.textContent = `${percentComplete}%`;
 }
