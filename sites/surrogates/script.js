@@ -342,7 +342,10 @@ async function fetchRatingStatus() {
 
 // Display Progress Summary
 function displayProgressSummary(data) {
-    const { totalFeatures, totalRatings } = data.summary || { totalFeatures: 0, totalWorkers: 0, totalRatings: 0 };
+    const { totalRatings } = data.summary || { totalRatings: 0 };
+
+    // Get total features from the uploaded survey, not from backend
+    const totalFeatures = surveyData ? surveyData.features.length : 0;
 
     // Use all available models from dropdown PLUS any workers that have submitted ratings
     // This matches the logic in displayCompletionTable
