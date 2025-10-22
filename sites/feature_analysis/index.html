@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature Analysis - Neuroscience Fiction</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Feature Analysis</h1>
+            <p class="subtitle">Analyze your feature ratings to optimize your brain prediction model</p>
+        </header>
+
+        <!-- Progress Indicator -->
+        <div class="progress-indicator">
+            <div class="progress-step active" data-step="1">
+                <div class="step-number">1</div>
+                <div class="step-label">Load Data</div>
+            </div>
+            <div class="progress-step" data-step="2">
+                <div class="step-number">2</div>
+                <div class="step-label">Reliability</div>
+            </div>
+            <div class="progress-step" data-step="3">
+                <div class="step-number">3</div>
+                <div class="step-label">Agreement</div>
+            </div>
+            <div class="progress-step" data-step="4">
+                <div class="step-number">4</div>
+                <div class="step-label">Redundancy</div>
+            </div>
+            <div class="progress-step" data-step="5">
+                <div class="step-number">5</div>
+                <div class="step-label">Similarity</div>
+            </div>
+            <div class="progress-step" data-step="6">
+                <div class="step-number">6</div>
+                <div class="step-label">Decisions</div>
+            </div>
+        </div>
+
+        <!-- Step 1: Load Data -->
+        <section class="step-section active" id="step1">
+            <div class="card">
+                <div class="step-header">
+                    <h2>Step 1: Load Your Ratings Data</h2>
+                </div>
+
+                <div class="explanation">
+                    <p>Let's start by loading your feature ratings from the server. You'll need your <strong>year</strong> and <strong>group name</strong>.</p>
+                    <p class="note">Your ratings may include both human raters and LLM models (surrogate raters like GPT-5 or Gemini).</p>
+                </div>
+
+                <div class="input-section">
+                    <div class="input-group">
+                        <label for="yearInput">Year:</label>
+                        <input type="text" id="yearInput" placeholder="e.g., 2025" value="2025">
+                    </div>
+                    <div class="input-group">
+                        <label for="groupNameInput">Group Name:</label>
+                        <input type="text" id="groupNameInput" placeholder="e.g., YourGroupName">
+                    </div>
+                    <button id="loadDataBtn" class="btn-primary">Load Data</button>
+                </div>
+
+                <div id="loadingIndicator" class="loading-message" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Loading your ratings data...</p>
+                </div>
+
+                <div id="dataLoadError" class="error-message" style="display: none;"></div>
+
+                <div id="dataSummary" class="data-summary" style="display: none;">
+                    <h3>Data Loaded Successfully!</h3>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <div class="summary-label">Items:</div>
+                            <div class="summary-value" id="numItems">0</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Features:</div>
+                            <div class="summary-value" id="numFeatures">0</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Raters:</div>
+                            <div class="summary-value" id="numRaters">0</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Total Ratings:</div>
+                            <div class="summary-value" id="totalRatings">0</div>
+                        </div>
+                    </div>
+
+                    <div id="droppedRatersSection" class="dropped-raters-section" style="display: none;">
+                        <h4>⚠️ Raters Excluded (Incomplete Ratings):</h4>
+                        <p class="explanation-text">The following raters were excluded because they didn't complete all ratings:</p>
+                        <div id="droppedRatersList" class="dropped-raters-list"></div>
+                    </div>
+
+                    <div class="rater-breakdown">
+                        <h4>Active Raters:</h4>
+                        <div id="raterList" class="rater-list"></div>
+                    </div>
+
+                    <details class="data-preview">
+                        <summary>Preview Data (first 10 rows)</summary>
+                        <div id="dataPreviewTable"></div>
+                    </details>
+                </div>
+
+                <div class="step-navigation">
+                    <button id="step1Next" class="btn-next" disabled>Next: Feature Reliability →</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 2: Feature Reliability -->
+        <section class="step-section" id="step2">
+            <div class="card">
+                <div class="step-header">
+                    <h2>Step 2: Feature Reliability</h2>
+                </div>
+
+                <div class="explanation">
+                    <h3>What is Feature Reliability?</h3>
+                    <p>Feature reliability measures how <strong>consistently</strong> different raters (humans and LLMs) agreed on each feature.</p>
+
+                    <details>
+                        <summary>How does it work?</summary>
+                        <div class="explanation-detail">
+                            <p>For each feature, we:</p>
+                            <ol>
+                                <li>Take ratings from two raters across all items</li>
+                                <li>Calculate the correlation between their ratings</li>
+                                <li>Repeat for all pairs of raters</li>
+                                <li>Average these correlations</li>
+                            </ol>
+                            <p><strong>Higher values = better reliability</strong> (raters agreed more)</p>
+                            <p>Features with low reliability (&lt; 0.5) may be subjective or poorly defined.</p>
+                        </div>
+                    </details>
+
+                    <div class="note">
+                        <strong>Note on LLM Raters:</strong> LLM models may show different consistency patterns than humans.
+                        Deterministic LLMs (temperature=0) might have perfect self-consistency, while humans have natural variation.
+                        Both are valid - focus on overall agreement across all raters.
+                    </div>
+                </div>
+
+                <div id="reliabilityAnalysis">
+                    <button id="computeReliabilityBtn" class="btn-primary">Compute Feature Reliability</button>
+
+                    <div id="reliabilityLoading" class="loading-message" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Computing correlations...</p>
+                    </div>
+
+                    <div id="reliabilityResults" style="display: none;">
+                        <div class="results-header">
+                            <h3>Feature Reliability Results</h3>
+                            <button id="downloadReliabilityChart" class="btn-download">Download Chart (PNG)</button>
+                        </div>
+
+                        <div class="chart-container">
+                            <canvas id="reliabilityChart"></canvas>
+                        </div>
+
+                        <details class="data-table-section">
+                            <summary>View Data Table</summary>
+                            <div id="reliabilityTable"></div>
+                        </details>
+
+                        <div class="interpretation">
+                            <h4>Interpretation Guide:</h4>
+                            <ul>
+                                <li><strong>r &gt; 0.7:</strong> Excellent reliability - strong agreement</li>
+                                <li><strong>r = 0.5-0.7:</strong> Good reliability - moderate agreement</li>
+                                <li><strong>r = 0.3-0.5:</strong> Fair reliability - consider reviewing feature definition</li>
+                                <li><strong>r &lt; 0.3:</strong> Poor reliability - feature may be too subjective</li>
+                                <li><strong>NaN (Not a Number):</strong> No variance - all raters gave identical ratings for this feature across all items. This means the feature doesn't discriminate between items in your dataset.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step-navigation">
+                    <button id="step2Prev" class="btn-prev">← Previous</button>
+                    <button id="step2Next" class="btn-next" disabled>Next: Rater Agreement →</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 3: Rater Agreement (Placeholder) -->
+        <section class="step-section" id="step3">
+            <div class="card">
+                <div class="step-header">
+                    <h2>Step 3: Rater Agreement</h2>
+                </div>
+                <div class="explanation">
+                    <p><em>Coming soon...</em></p>
+                </div>
+                <div class="step-navigation">
+                    <button id="step3Prev" class="btn-prev">← Previous</button>
+                    <button id="step3Next" class="btn-next">Next →</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Steps 4-6 placeholders -->
+        <section class="step-section" id="step4">
+            <div class="card">
+                <h2>Step 4: Feature Redundancy</h2>
+                <p><em>Coming soon...</em></p>
+                <div class="step-navigation">
+                    <button id="step4Prev" class="btn-prev">← Previous</button>
+                    <button id="step4Next" class="btn-next">Next →</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="step-section" id="step5">
+            <div class="card">
+                <h2>Step 5: Item Similarity</h2>
+                <p><em>Coming soon...</em></p>
+                <div class="step-navigation">
+                    <button id="step5Prev" class="btn-prev">← Previous</button>
+                    <button id="step5Next" class="btn-next">Next →</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="step-section" id="step6">
+            <div class="card">
+                <h2>Step 6: Make Decisions</h2>
+                <p><em>Coming soon...</em></p>
+                <div class="step-navigation">
+                    <button id="step6Prev" class="btn-prev">← Previous</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Custom Libraries -->
+    <script src="lib/dataframe.js"></script>
+    <script src="lib/stats.js"></script>
+
+    <!-- Main Script -->
+    <script src="script.js"></script>
+</body>
+</html>

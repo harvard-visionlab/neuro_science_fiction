@@ -1,0 +1,255 @@
+/**
+ * Statistical Functions
+ * Implementations of correlation, mean, and other statistical operations
+ */
+
+// Calculate mean of an array
+function mean(arr) {
+    if (arr.length === 0) return NaN;
+    return arr.reduce((sum, val) => sum + val, 0) / arr.length;
+}
+
+// Calculate mean excluding NaN values
+function nanmean(arr) {
+    const filtered = arr.filter(val => !isNaN(val) && val !== null && val !== undefined);
+    return mean(filtered);
+}
+
+// Calculate standard deviation
+function std(arr) {
+    const m = mean(arr);
+    const squareDiffs = arr.map(val => Math.pow(val - m, 2));
+    return Math.sqrt(mean(squareDiffs));
+}
+
+// Pearson correlation coefficient between two arrays
+function correlate(arr1, arr2) {
+    if (arr1.length !== arr2.length) {
+        throw new Error('Arrays must have the same length');
+    }
+
+    const n = arr1.length;
+    if (n === 0) return NaN;
+
+    // Calculate means
+    const mean1 = mean(arr1);
+    const mean2 = mean(arr2);
+
+    // Calculate correlation
+    let numerator = 0;
+    let sum1Sq = 0;
+    let sum2Sq = 0;
+
+    for (let i = 0; i < n; i++) {
+        const diff1 = arr1[i] - mean1;
+        const diff2 = arr2[i] - mean2;
+
+        numerator += diff1 * diff2;
+        sum1Sq += diff1 * diff1;
+        sum2Sq += diff2 * diff2;
+    }
+
+    const denominator = Math.sqrt(sum1Sq * sum2Sq);
+
+    if (denominator === 0) return NaN;
+
+    return numerator / denominator;
+}
+
+// Correlation matrix for a 2D array (rows are variables)
+function corrcoef(matrix) {
+    const n = matrix.length; // number of variables
+    const corrMatrix = [];
+
+    for (let i = 0; i < n; i++) {
+        corrMatrix[i] = [];
+        for (let j = 0; j < n; j++) {
+            if (i === j) {
+                corrMatrix[i][j] = 1.0;
+            } else {
+                corrMatrix[i][j] = correlate(matrix[i], matrix[j]);
+            }
+        }
+    }
+
+    return corrMatrix;
+}
+
+// Get upper triangle indices of a matrix (excluding diagonal)
+function triuIndices(n, k = 1) {
+    const indices = [];
+    for (let i = 0; i < n; i++) {
+        for (let j = i + k; j < n; j++) {
+            indices.push([i, j]);
+        }
+    }
+    return indices;
+}
+
+// Extract upper triangle values from a matrix
+function getUpperTriangle(matrix, k = 1) {
+    const n = matrix.length;
+    const indices = triuIndices(n, k);
+    return indices.map(([i, j]) => matrix[i][j]);
+}
+
+// Calculate absolute value
+function abs(x) {
+    return Math.abs(x);
+}
+
+// Element-wise absolute value for array
+function absArray(arr) {
+    return arr.map(abs);
+}
+
+// Element-wise absolute value for 2D matrix
+function absMatrix(matrix) {
+    return matrix.map(row => absArray(row));
+}
+
+// Sort features by consistency (average inter-rater correlation)
+function sortFeaturesByConsistency(ratingsByFeature) {
+    const results = [];
+
+    Object.entries(ratingsByFeature).forEach(([featureName, ratings]) => {
+        const raterVsRater = corrcoef(ratings);
+        const numRaters = raterVsRater.length;
+        const upperTriangle = getUpperTriangle(raterVsRater);
+        const avgCorr = nanmean(upperTriangle);
+
+        results.push({
+            featureName: featureName,
+            avgCorr: avgCorr
+        });
+    });
+
+    // Sort by avg correlation (ascending - lowest first)
+    results.sort((a, b) => a.avgCorr - b.avgCorr);
+
+    return results;
+}
+
+// Compute rater agreement
+function computeRaterAgreement(df, ratingsByFeature) {
+    const raters = df.unique('workerId');
+    const results = [];
+    const raterVsRaterAll = [];
+
+    Object.entries(ratingsByFeature).forEach(([featureName, ratings]) => {
+        const raterVsRater = corrcoef(ratings);
+        const numRaters = raterVsRater.length;
+
+        // Calculate consistency for each rater
+        for (let raterNum = 0; raterNum < numRaters; raterNum++) {
+            // Average correlation with all other raters
+            const correlations = raterVsRater[raterNum];
+            const raterConsistency = (correlations.reduce((sum, val) => sum + val, 0) - 1) / (numRaters - 1);
+
+            results.push({
+                featureName: featureName,
+                rater: raters[raterNum],
+                avgCorr: raterConsistency
+            });
+        }
+
+        raterVsRaterAll.push(raterVsRater);
+    });
+
+    return { results, raterVsRaterAll };
+}
+
+// Average correlation across matrices (for rater agreement heatmap)
+function averageMatrices(matrices) {
+    if (matrices.length === 0) return [];
+
+    const n = matrices[0].length;
+    const avgMatrix = [];
+
+    for (let i = 0; i < n; i++) {
+        avgMatrix[i] = [];
+        for (let j = 0; j < n; j++) {
+            const values = matrices.map(m => m[i][j]);
+            avgMatrix[i][j] = nanmean(values);
+        }
+    }
+
+    return avgMatrix;
+}
+
+// Compute feature vs feature correlation
+function computeFeatureVsFeatureCorr(df) {
+    const features = df.unique('featureName');
+    const items = df.unique('itemName');
+
+    const featureMatrix = [];
+
+    features.forEach(feature => {
+        const itemRatings = [];
+
+        items.forEach(item => {
+            const subset = df.subset({ featureName: feature, itemName: item });
+            // Average ratings across all raters for this feature-item combination
+            const ratings = subset.data.map(row => row.ratingScaled !== undefined ? row.ratingScaled : row.rating);
+            itemRatings.push(mean(ratings));
+        });
+
+        featureMatrix.push(itemRatings);
+    });
+
+    const featureVsFeature = corrcoef(featureMatrix);
+
+    return { featureMatrix, featureVsFeature };
+}
+
+// Compute item vs item correlation
+function computeItemVsItemCorr(df) {
+    const features = df.unique('featureName');
+    const items = df.unique('itemName');
+
+    const itemMatrix = [];
+
+    items.forEach(item => {
+        const featureRatings = [];
+
+        features.forEach(feature => {
+            const subset = df.subset({ featureName: feature, itemName: item });
+            // Average ratings across all raters for this item-feature combination
+            const ratings = subset.data.map(row => row.ratingScaled !== undefined ? row.ratingScaled : row.rating);
+            featureRatings.push(mean(ratings));
+        });
+
+        itemMatrix.push(featureRatings);
+    });
+
+    const itemVsItem = corrcoef(itemMatrix);
+
+    return { itemMatrix, itemVsItem };
+}
+
+// Compute feature redundancy (pairwise correlations)
+function computeFeatureRedundancy(df) {
+    const { featureVsFeature } = computeFeatureVsFeatureCorr(df);
+    const features = df.unique('featureName');
+    const numFeatures = features.length;
+    const pairs = [];
+
+    for (let i = 0; i < numFeatures - 1; i++) {
+        for (let j = i + 1; j < numFeatures; j++) {
+            const corr = featureVsFeature[i][j];
+            pairs.push({
+                feature1: features[i],
+                feature2: features[j],
+                pair: `${features[i]} vs ${features[j]}`,
+                correlation: corr,
+                absCorrelation: Math.abs(corr),
+                sign: corr > 0 ? 'positive' : 'negative'
+            });
+        }
+    }
+
+    // Sort by absolute correlation
+    pairs.sort((a, b) => a.absCorrelation - b.absCorrelation);
+
+    return pairs;
+}
