@@ -316,20 +316,31 @@ async function handleLoadData() {
             row.workerType = categorizeRater(row.workerId);
         });
 
+        // Store year and groupName first
+        appState.year = year;
+        appState.groupName = groupName;
+
+        // Load exclusions from localStorage
+        loadExclusions(year, groupName);
+
         // Create DataFrame
         let df = createDataFrame(allData);
 
         // Filter out incomplete raters
         const filterResult = filterIncompleteRaters(df);
-        appState.df = filterResult.df;
+
+        // Store raw (unfiltered by exclusions) data
+        appState.rawDf = filterResult.df;
         appState.droppedRaters = filterResult.droppedRaters;
         appState.maxCount = filterResult.maxCount;
         appState.raterCounts = filterResult.raterCounts;
-        appState.year = year;
-        appState.groupName = groupName;
 
-        // Display summary
+        // Apply exclusions to get final filtered df
+        applyExclusions();
+
+        // Display summary and exclusion controls
         displayDataSummary();
+        renderExclusionControls();
 
         // Enable next button
         step1Next.disabled = false;
@@ -372,6 +383,206 @@ function handleDownloadLoadedData() {
     document.body.removeChild(link);
 
     URL.revokeObjectURL(url);
+}
+
+// Apply exclusions to filter rawDf → df
+function applyExclusions() {
+    if (!appState.rawDf) return;
+
+    // Filter out excluded raters and features
+    const filteredData = appState.rawDf.data.filter(row => {
+        return !appState.excludedRaters.includes(row.workerId) &&
+               !appState.excludedFeatures.includes(row.featureName);
+    });
+
+    // Create new DataFrame from filtered data
+    appState.df = createDataFrame(filteredData);
+
+    console.log(`Applied exclusions: ${appState.excludedRaters.length} raters, ${appState.excludedFeatures.length} features excluded`);
+    console.log(`Filtered data: ${filteredData.length} rows`);
+}
+
+// Invalidate all analysis results (Steps 2-5)
+function invalidateAnalyses() {
+    // Clear all analysis results
+    appState.ratingsByFeature = null;
+    appState.reliabilityResults = null;
+    appState.reliabilityChart = null;
+    appState.agreementResults = null;
+    appState.agreementHeatmap = null;
+    appState.redundancyResults = null;
+    appState.redundancyChart = null;
+    appState.similarityResults = null;
+    appState.similarityChart = null;
+
+    // Hide results sections
+    if (reliabilityResults) reliabilityResults.style.display = 'none';
+    if (agreementResults) agreementResults.style.display = 'none';
+    if (redundancyResults) redundancyResults.style.display = 'none';
+    if (similarityResults) similarityResults.style.display = 'none';
+
+    // Disable navigation beyond Step 2
+    document.getElementById('step2Next').disabled = true;
+    document.getElementById('step3Next').disabled = true;
+    document.getElementById('step4Next').disabled = true;
+    document.getElementById('step5Next').disabled = true;
+
+    // Show warning if exclusions were changed
+    showExclusionWarning();
+}
+
+function showExclusionWarning() {
+    const warningDiv = document.getElementById('exclusionWarning');
+    if (warningDiv) {
+        warningDiv.style.display = 'block';
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            warningDiv.style.display = 'none';
+        }, 5000);
+    }
+}
+
+function handleRaterExclusionToggle(event) {
+    const workerId = event.target.value;
+    const isChecked = event.target.checked;
+
+    if (isChecked) {
+        // Add to exclusions
+        if (!appState.excludedRaters.includes(workerId)) {
+            appState.excludedRaters.push(workerId);
+        }
+    } else {
+        // Remove from exclusions
+        appState.excludedRaters = appState.excludedRaters.filter(id => id !== workerId);
+    }
+
+    // Save to localStorage
+    saveExclusions(appState.year, appState.groupName);
+
+    // Re-apply exclusions
+    applyExclusions();
+
+    // Update display
+    displayDataSummary();
+    renderExclusionControls();
+
+    // Invalidate analyses
+    invalidateAnalyses();
+}
+
+function handleFeatureExclusionToggle(event) {
+    const featureName = event.target.value;
+    const isChecked = event.target.checked;
+
+    if (isChecked) {
+        // Add to exclusions
+        if (!appState.excludedFeatures.includes(featureName)) {
+            appState.excludedFeatures.push(featureName);
+        }
+    } else {
+        // Remove from exclusions
+        appState.excludedFeatures = appState.excludedFeatures.filter(f => f !== featureName);
+    }
+
+    // Save to localStorage
+    saveExclusions(appState.year, appState.groupName);
+
+    // Re-apply exclusions
+    applyExclusions();
+
+    // Update display
+    displayDataSummary();
+    renderExclusionControls();
+
+    // Invalidate analyses
+    invalidateAnalyses();
+}
+
+function renderExclusionControls() {
+    if (!appState.rawDf) return;
+
+    // Get all unique raters and features from raw (unfiltered) data
+    const allRaters = appState.rawDf.unique('workerId');
+    const allFeatures = appState.rawDf.unique('featureName');
+
+    // Render rater exclusions
+    const raterListDiv = document.getElementById('raterExclusionList');
+    let raterHtml = '';
+
+    allRaters.forEach(workerId => {
+        const isExcluded = appState.excludedRaters.includes(workerId);
+        const raterType = categorizeRater(workerId);
+        const raterData = appState.rawDf.subset({ workerId: workerId });
+        const numRatings = raterData.length;
+
+        raterHtml += `
+            <div class="exclusion-item ${isExcluded ? 'excluded' : ''}">
+                <label>
+                    <input type="checkbox"
+                           class="rater-exclusion-checkbox"
+                           value="${workerId}"
+                           ${isExcluded ? 'checked' : ''}>
+                    <span class="exclusion-label">
+                        ${workerId}
+                        <span class="rater-type ${raterType.toLowerCase()}">${raterType}</span>
+                        <span class="exclusion-stats">${numRatings} ratings</span>
+                        ${isExcluded ? '<span class="excluded-badge">EXCLUDED</span>' : ''}
+                    </span>
+                </label>
+            </div>
+        `;
+    });
+
+    raterListDiv.innerHTML = raterHtml;
+
+    // Add event listeners to rater checkboxes
+    document.querySelectorAll('.rater-exclusion-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', handleRaterExclusionToggle);
+    });
+
+    // Update exclusion count in summary
+    const raterExclusionSummary = document.querySelector('#raterExclusionSection summary');
+    if (raterExclusionSummary) {
+        const count = appState.excludedRaters.length;
+        raterExclusionSummary.textContent = `Exclude Raters (Optional)${count > 0 ? ` - ${count} excluded` : ''}`;
+    }
+
+    // Render feature exclusions
+    const featureListDiv = document.getElementById('featureExclusionList');
+    let featureHtml = '';
+
+    allFeatures.forEach(featureName => {
+        const isExcluded = appState.excludedFeatures.includes(featureName);
+
+        featureHtml += `
+            <div class="exclusion-item ${isExcluded ? 'excluded' : ''}">
+                <label>
+                    <input type="checkbox"
+                           class="feature-exclusion-checkbox"
+                           value="${featureName}"
+                           ${isExcluded ? 'checked' : ''}>
+                    <span class="exclusion-label">
+                        ${featureName}
+                        ${isExcluded ? '<span class="excluded-badge">EXCLUDED</span>' : ''}
+                    </span>
+                </label>
+            </div>
+        `;
+    });
+
+    featureListDiv.innerHTML = featureHtml;
+
+    // Add event listeners to feature checkboxes
+    document.querySelectorAll('.feature-exclusion-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', handleFeatureExclusionToggle);
+    });
+
+    // Update exclusion count in summary
+    const featureExclusionSummary = document.querySelector('#featureExclusionSection summary');
+    if (featureExclusionSummary) {
+        const count = appState.excludedFeatures.length;
+        featureExclusionSummary.textContent = `Exclude Features (Optional)${count > 0 ? ` - ${count} excluded` : ''}`;
+    }
 }
 
 function displayDataSummary() {

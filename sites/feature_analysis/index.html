@@ -97,6 +97,22 @@
                         <button id="downloadLoadedDataBtn" class="btn-download">Download Loaded Data (CSV)</button>
                     </div>
 
+                    <div id="exclusionWarning" class="note" style="display: none; margin: 20px 0;">
+                        <strong>⚠️ Exclusions Updated:</strong> Previous analysis results have been cleared. Re-run Steps 2-5 to analyze the filtered dataset.
+                    </div>
+
+                    <details class="exclusion-section" id="raterExclusionSection">
+                        <summary>Exclude Raters (Optional)</summary>
+                        <p class="explanation-text">Check raters to exclude them from all analyses. Useful for removing raters with low agreement or incomplete data.</p>
+                        <div id="raterExclusionList" class="exclusion-list"></div>
+                    </details>
+
+                    <details class="exclusion-section" id="featureExclusionSection">
+                        <summary>Exclude Features (Optional)</summary>
+                        <p class="explanation-text">Check features to exclude them from all analyses. Useful for removing features with poor reliability or high redundancy.</p>
+                        <div id="featureExclusionList" class="exclusion-list"></div>
+                    </details>
+
                     <div id="droppedRatersSection" class="dropped-raters-section" style="display: none;">
                         <h4>⚠️ Raters Excluded (Incomplete Ratings):</h4>
                         <p class="explanation-text">The following raters were excluded because they didn't complete all ratings:</p>

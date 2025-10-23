@@ -693,6 +693,89 @@ details[open] summary {
     margin-bottom: 10px;
 }
 
+/* Exclusion Sections */
+.exclusion-section {
+    margin: 20px 0;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+}
+
+.exclusion-section summary {
+    cursor: pointer;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-weight: 600;
+    user-select: none;
+}
+
+.exclusion-section summary:hover {
+    background: #e9ecef;
+}
+
+.exclusion-section[open] summary {
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 6px 6px 0 0;
+}
+
+.exclusion-list {
+    padding: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.exclusion-item {
+    padding: 8px 12px;
+    margin: 5px 0;
+    border-radius: 4px;
+    background: #f8f9fa;
+    transition: background 0.2s;
+}
+
+.exclusion-item:hover {
+    background: #e9ecef;
+}
+
+.exclusion-item.excluded {
+    background: #fff3cd;
+    border-left: 3px solid #ffc107;
+}
+
+.exclusion-item label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin-bottom: 0;
+}
+
+.exclusion-item input[type="checkbox"] {
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+.exclusion-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.exclusion-stats {
+    font-size: 0.85em;
+    color: #6c757d;
+}
+
+.excluded-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #dc3545;
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 600;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     body {
