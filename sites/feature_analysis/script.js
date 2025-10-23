@@ -72,6 +72,13 @@ const similarityThresholdValue = document.getElementById('similarityThresholdVal
 const downloadSimilarityHeatmap = document.getElementById('downloadSimilarityHeatmap');
 const downloadSimilarityChart = document.getElementById('downloadSimilarityChart');
 
+// DOM Elements - Step 6
+const generateSummaryBtn = document.getElementById('generateSummaryBtn');
+const summaryLoading = document.getElementById('summaryLoading');
+const summaryResults = document.getElementById('summaryResults');
+const downloadFinalDataBtn = document.getElementById('downloadFinalDataBtn');
+const copySummaryBtn = document.getElementById('copySummaryBtn');
+
 // Initialize app
 function init() {
     setupEventListeners();
@@ -108,6 +115,11 @@ function setupEventListeners() {
     downloadSimilarityHeatmap.addEventListener('click', handleDownloadSimilarityHeatmap);
     downloadSimilarityChart.addEventListener('click', handleDownloadSimilarityChart);
     step5Next.addEventListener('click', () => navigateToStep(6));
+
+    // Step 6
+    generateSummaryBtn.addEventListener('click', handleGenerateSummary);
+    downloadFinalDataBtn.addEventListener('click', handleDownloadFinalData);
+    copySummaryBtn.addEventListener('click', handleCopySummary);
 
     // Navigation buttons for other steps
     document.getElementById('step2Prev').addEventListener('click', () => navigateToStep(1));
@@ -246,49 +258,58 @@ async function handleLoadData() {
     loadDataBtn.disabled = true;
 
     try {
-        // Fetch surrogate (LLM) ratings from Lambda
-        const surrogateUrl = `${GENERATE_CSV_URL}?year=${year}&groupName=${groupName}`;
-        const surrogateResponse = await fetch(surrogateUrl);
-
-        if (!surrogateResponse.ok) {
-            throw new Error(`Failed to load surrogate data: ${surrogateResponse.statusText}`);
-        }
-
-        const surrogateCsvText = await surrogateResponse.text();
-
-        // Fetch human ratings from scorsese server
-        const humanUrl = `https://scorsese.wjh.harvard.edu/turk/experiments/nsf/survey/${groupName}/data`;
-
-        let humanCsvText = '';
+        let surrogateData = [];
         let humanData = [];
 
+        // Try to fetch surrogate (LLM) ratings from Lambda
+        const surrogateUrl = `${GENERATE_CSV_URL}?year=${year}&groupName=${groupName}`;
+        try {
+            const surrogateResponse = await fetch(surrogateUrl);
+            if (surrogateResponse.ok) {
+                const surrogateCsvText = await surrogateResponse.text();
+                const surrogateParsed = Papa.parse(surrogateCsvText, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true
+                });
+
+                if (surrogateParsed.errors.length > 0) {
+                    console.error('CSV parsing errors (surrogate):', surrogateParsed.errors);
+                }
+
+                surrogateData = surrogateParsed.data;
+                console.log(`Loaded ${surrogateData.length} surrogate ratings`);
+            } else {
+                console.log('No surrogate data found (this is OK for older datasets)');
+            }
+        } catch (surrogateError) {
+            console.log('Could not fetch surrogate data (this is OK for older datasets):', surrogateError.message);
+        }
+
+        // Try to fetch human ratings from scorsese server
+        const humanUrl = `https://scorsese.wjh.harvard.edu/turk/experiments/nsf/survey/${groupName}/data`;
         try {
             const humanResponse = await fetch(humanUrl);
             if (humanResponse.ok) {
-                humanCsvText = await humanResponse.text();
+                const humanCsvText = await humanResponse.text();
                 const humanParsed = Papa.parse(humanCsvText, {
                     header: true,
                     dynamicTyping: true,
                     skipEmptyLines: true
                 });
                 humanData = humanParsed.data;
+                console.log(`Loaded ${humanData.length} human ratings`);
+            } else {
+                console.log('No human data found (this is OK for surrogate-only datasets)');
             }
         } catch (humanError) {
-            // Silently continue with surrogate ratings only
+            console.log('Could not fetch human data (this is OK for surrogate-only datasets):', humanError.message);
         }
 
-        // Parse surrogate CSV
-        const surrogateParsed = Papa.parse(surrogateCsvText, {
-            header: true,
-            dynamicTyping: true,
-            skipEmptyLines: true
-        });
-
-        if (surrogateParsed.errors.length > 0) {
-            console.error('CSV parsing errors (surrogate):', surrogateParsed.errors);
+        // Check if we have any data at all
+        if (surrogateData.length === 0 && humanData.length === 0) {
+            throw new Error(`No data found for year=${year}, groupName=${groupName}. Please check your inputs and try again.`);
         }
-
-        const surrogateData = surrogateParsed.data;
 
         // Merge human and surrogate data
         const allData = [...humanData, ...surrogateData];
@@ -453,28 +474,69 @@ function checkDataIntegrity(df) {
 
 // Invalidate all analysis results (Steps 2-5)
 function invalidateAnalyses() {
+    // Destroy Chart.js instances before clearing references
+    if (appState.reliabilityChart) {
+        appState.reliabilityChart.destroy();
+        appState.reliabilityChart = null;
+    }
+    if (appState.redundancyChart) {
+        appState.redundancyChart.destroy();
+        appState.redundancyChart = null;
+    }
+    if (appState.similarityChart) {
+        appState.similarityChart.destroy();
+        appState.similarityChart = null;
+    }
+
+    // Clear Plotly heatmaps
+    if (appState.agreementHeatmap) {
+        Plotly.purge('agreementHeatmap');
+        appState.agreementHeatmap = null;
+    }
+    const redundancyHeatmapDiv = document.getElementById('redundancyHeatmap');
+    if (redundancyHeatmapDiv) {
+        Plotly.purge('redundancyHeatmap');
+    }
+    const similarityHeatmapDiv = document.getElementById('similarityHeatmap');
+    if (similarityHeatmapDiv) {
+        Plotly.purge('similarityHeatmap');
+    }
+
     // Clear all analysis results
     appState.ratingsByFeature = null;
     appState.reliabilityResults = null;
-    appState.reliabilityChart = null;
     appState.agreementResults = null;
-    appState.agreementHeatmap = null;
     appState.redundancyResults = null;
-    appState.redundancyChart = null;
     appState.similarityResults = null;
-    appState.similarityChart = null;
 
     // Hide results sections
     if (reliabilityResults) reliabilityResults.style.display = 'none';
     if (agreementResults) agreementResults.style.display = 'none';
     if (redundancyResults) redundancyResults.style.display = 'none';
     if (similarityResults) similarityResults.style.display = 'none';
+    if (summaryResults) summaryResults.style.display = 'none';
 
-    // Disable navigation beyond Step 2
+    // Re-enable all compute buttons so users can re-run analyses
+    if (computeReliabilityBtn) computeReliabilityBtn.disabled = false;
+    if (computeAgreementBtn) computeAgreementBtn.disabled = false;
+    if (computeRedundancyBtn) computeRedundancyBtn.disabled = false;
+    if (computeSimilarityBtn) computeSimilarityBtn.disabled = false;
+    if (generateSummaryBtn) generateSummaryBtn.disabled = false;
+
+    // Disable navigation beyond Step 2 (will be re-enabled when analyses complete)
     document.getElementById('step2Next').disabled = true;
     document.getElementById('step3Next').disabled = true;
     document.getElementById('step4Next').disabled = true;
     document.getElementById('step5Next').disabled = true;
+
+    // Reset progress indicators - mark steps 2-6 as incomplete
+    const progressSteps = document.querySelectorAll('.progress-step');
+    progressSteps.forEach((step, index) => {
+        // Keep step 1 completed, mark steps 2-6 as incomplete
+        if (index >= 1) { // index 1 = step 2, index 2 = step 3, etc.
+            step.classList.remove('completed');
+        }
+    });
 
     // Show warning if exclusions were changed
     showExclusionWarning();
@@ -554,11 +616,24 @@ function renderExclusionControls() {
     const allRaters = appState.rawDf.unique('workerId');
     const allFeatures = appState.rawDf.unique('featureName');
 
+    // Sort raters: LLMs first (alphabetically), then humans (alphabetically)
+    const sortedRaters = [...allRaters].sort((a, b) => {
+        const aType = categorizeRater(a);
+        const bType = categorizeRater(b);
+
+        // LLMs come before Humans
+        if (aType === 'LLM' && bType === 'Human') return -1;
+        if (aType === 'Human' && bType === 'LLM') return 1;
+
+        // Within same type, sort alphabetically
+        return a.localeCompare(b);
+    });
+
     // Render rater exclusions
     const raterListDiv = document.getElementById('raterExclusionList');
     let raterHtml = '';
 
-    allRaters.forEach(workerId => {
+    sortedRaters.forEach(workerId => {
         const isExcluded = appState.excludedRaters.includes(workerId);
         const raterType = categorizeRater(workerId);
         const raterData = appState.rawDf.subset({ workerId: workerId });
@@ -757,7 +832,49 @@ function displayRaterBreakdown(raters) {
     const raterList = document.getElementById('raterList');
     raterList.innerHTML = '';
 
-    raters.forEach(rater => {
+    // Count human vs LLM raters
+    const humanRaters = raters.filter(r => categorizeRater(r) === 'Human');
+    const llmRaters = raters.filter(r => categorizeRater(r) === 'LLM');
+
+    // Show data source breakdown on its own line
+    const breakdown = document.createElement('div');
+    breakdown.className = 'note';
+    breakdown.style.marginBottom = '15px';
+    breakdown.style.fontSize = '0.95em';
+    breakdown.style.width = '100%';  // Force full width
+
+    let breakdownText = `<strong>Data Sources:</strong> `;
+    if (humanRaters.length > 0 && llmRaters.length > 0) {
+        breakdownText += `${humanRaters.length} human rater(s) + ${llmRaters.length} LLM rater(s)`;
+    } else if (humanRaters.length > 0) {
+        breakdownText += `${humanRaters.length} human rater(s) only (no surrogate/LLM data)`;
+    } else if (llmRaters.length > 0) {
+        breakdownText += `${llmRaters.length} LLM rater(s) only (no human data)`;
+    }
+    breakdown.innerHTML = breakdownText;
+    raterList.appendChild(breakdown);
+
+    // Sort raters: LLMs first (alphabetically), then humans (alphabetically)
+    const sortedRaters = [...raters].sort((a, b) => {
+        const aType = categorizeRater(a);
+        const bType = categorizeRater(b);
+
+        // LLMs come before Humans
+        if (aType === 'LLM' && bType === 'Human') return -1;
+        if (aType === 'Human' && bType === 'LLM') return 1;
+
+        // Within same type, sort alphabetically
+        return a.localeCompare(b);
+    });
+
+    // Create a wrapper div for badges to keep them in a flex grid
+    const badgesWrapper = document.createElement('div');
+    badgesWrapper.style.display = 'flex';
+    badgesWrapper.style.flexWrap = 'wrap';
+    badgesWrapper.style.gap = '10px';
+
+    // Display individual rater badges
+    sortedRaters.forEach(rater => {
         const badge = document.createElement('div');
         badge.className = 'rater-badge';
 
@@ -769,8 +886,10 @@ function displayRaterBreakdown(raters) {
             <span class="rater-type ${typeClass}">${raterType}</span>
         `;
 
-        raterList.appendChild(badge);
+        badgesWrapper.appendChild(badge);
     });
+
+    raterList.appendChild(badgesWrapper);
 }
 
 function displayDataPreview() {
@@ -1628,6 +1747,12 @@ async function handleComputeSimilarity() {
             // Compute item similarity
             const { itemVsItem } = computeItemVsItemCorr(appState.df);
             const items = appState.df.unique('itemName');
+            const features = appState.df.unique('featureName');
+
+            // Check if we have enough features for meaningful correlation
+            if (features.length < 3) {
+                alert(`⚠️ Warning: Only ${features.length} feature(s) remaining.\n\nItem similarity requires at least 3 features for meaningful results.\n\nWith ${features.length} feature(s), correlations will always be ±1 (perfect correlation) because any 2 points lie on a perfect line. This is mathematically correct but statistically meaningless.\n\nRecommendation: Include at least 3 features for valid item similarity analysis.`);
+            }
 
             // Compute pairwise correlations
             const pairs = [];
@@ -1995,6 +2120,313 @@ function handleDownloadSimilarityChart() {
     link.download = `${appState.year}_${appState.groupName}_item_similarity_chart.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
+}
+
+// Step 6: Summary & Export
+async function handleGenerateSummary() {
+    if (!appState.df) {
+        alert('Please load data first (Step 1)');
+        return;
+    }
+
+    // Show loading
+    summaryLoading.style.display = 'block';
+    summaryResults.style.display = 'none';
+    generateSummaryBtn.disabled = true;
+
+    // Use setTimeout to allow UI to update
+    setTimeout(() => {
+        try {
+            displaySummaryResults();
+            displayFinalDatasetInfo();
+            displayRecommendations();
+
+            // Show results
+            summaryLoading.style.display = 'none';
+            summaryResults.style.display = 'block';
+
+        } catch (error) {
+            console.error('Error generating summary:', error);
+            alert(`Error generating summary: ${error.message}`);
+            summaryLoading.style.display = 'none';
+            generateSummaryBtn.disabled = false;
+        }
+    }, 100);
+}
+
+function displaySummaryResults() {
+    const summaryDiv = document.getElementById('summaryContent');
+    const items = appState.df.unique('itemName');
+    const features = appState.df.unique('featureName');
+    const raters = appState.df.unique('workerId');
+
+    let html = '<div class="summary-grid" style="margin-bottom: 20px;">';
+
+    // Step 2: Feature Reliability
+    if (appState.reliabilityResults) {
+        const excellent = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr >= 0.7).length;
+        const good = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr >= 0.5 && r.avgCorr < 0.7).length;
+        const fair = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr >= 0.3 && r.avgCorr < 0.5).length;
+        const poor = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr < 0.3).length;
+
+        html += `
+            <div class="summary-item">
+                <div class="summary-label">Feature Reliability</div>
+                <div class="summary-value" style="font-size: 0.9em; text-align: left;">
+                    • ${excellent} excellent<br>
+                    • ${good} good<br>
+                    • ${fair} fair<br>
+                    • ${poor} poor
+                </div>
+            </div>
+        `;
+    }
+
+    // Step 3: Rater Agreement
+    if (appState.agreementResults) {
+        const avgAgreement = nanmean(Object.values(appState.agreementResults.raterSummary));
+        html += `
+            <div class="summary-item">
+                <div class="summary-label">Avg Rater Agreement</div>
+                <div class="summary-value">${avgAgreement.toFixed(3)}</div>
+            </div>
+        `;
+    }
+
+    // Step 4: Feature Redundancy
+    if (appState.redundancyResults) {
+        const veryHigh = appState.redundancyResults.pairs.filter(p => !isNaN(p.absCorrelation) && p.absCorrelation >= 0.9).length;
+        const moderate = appState.redundancyResults.pairs.filter(p => !isNaN(p.absCorrelation) && p.absCorrelation >= 0.7 && p.absCorrelation < 0.9).length;
+
+        html += `
+            <div class="summary-item">
+                <div class="summary-label">Redundant Feature Pairs</div>
+                <div class="summary-value" style="font-size: 0.9em; text-align: left;">
+                    • ${veryHigh} very high (≥0.9)<br>
+                    • ${moderate} moderate (0.7-0.9)
+                </div>
+            </div>
+        `;
+    }
+
+    // Step 5: Item Similarity
+    if (appState.similarityResults) {
+        const validPairs = appState.similarityResults.pairs.filter(p => !isNaN(p.absCorrelation));
+        const avgSim = validPairs.length > 0 ?
+            validPairs.reduce((sum, p) => sum + p.absCorrelation, 0) / validPairs.length : 0;
+
+        html += `
+            <div class="summary-item">
+                <div class="summary-label">Avg Item Similarity</div>
+                <div class="summary-value">${avgSim.toFixed(3)}</div>
+            </div>
+        `;
+    }
+
+    html += '</div>';
+    summaryDiv.innerHTML = html;
+}
+
+function displayFinalDatasetInfo() {
+    const infoDiv = document.getElementById('finalDatasetInfo');
+    const items = appState.df.unique('itemName');
+    const features = appState.df.unique('featureName');
+    const raters = appState.df.unique('workerId');
+
+    let html = '<div class="summary-grid">';
+    html += `
+        <div class="summary-item">
+            <div class="summary-label">Items</div>
+            <div class="summary-value">${items.length}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Features</div>
+            <div class="summary-value">${features.length}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Raters</div>
+            <div class="summary-value">${raters.length}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Total Ratings</div>
+            <div class="summary-value">${appState.df.length}</div>
+        </div>
+    `;
+    html += '</div>';
+
+    if (appState.excludedRaters.length > 0 || appState.excludedFeatures.length > 0) {
+        html += '<div class="note" style="margin-top: 15px;">';
+        html += '<strong>Exclusions Applied:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
+        if (appState.excludedRaters.length > 0) {
+            html += `<li>${appState.excludedRaters.length} rater(s) excluded: ${appState.excludedRaters.join(', ')}</li>`;
+        }
+        if (appState.excludedFeatures.length > 0) {
+            html += `<li>${appState.excludedFeatures.length} feature(s) excluded: ${appState.excludedFeatures.join(', ')}</li>`;
+        }
+        html += '</ul></div>';
+    }
+
+    infoDiv.innerHTML = html;
+}
+
+function displayRecommendations() {
+    const recDiv = document.getElementById('recommendationsContent');
+    const recommendations = [];
+
+    // Check feature reliability
+    if (appState.reliabilityResults) {
+        const poor = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr < 0.5);
+        if (poor.length > 0) {
+            recommendations.push({
+                type: 'warning',
+                message: `Consider excluding ${poor.length} feature(s) with poor reliability (<0.5): ${poor.map(r => r.featureName).join(', ')}`
+            });
+        }
+    }
+
+    // Check rater agreement
+    if (appState.agreementResults) {
+        const poorRaters = Object.entries(appState.agreementResults.raterSummary)
+            .filter(([rater, avgCorr]) => !isNaN(avgCorr) && avgCorr < 0.3)
+            .map(([rater, avgCorr]) => rater);
+
+        if (poorRaters.length > 0) {
+            recommendations.push({
+                type: 'warning',
+                message: `Consider excluding ${poorRaters.length} rater(s) with low agreement (<0.3): ${poorRaters.join(', ')}`
+            });
+        }
+    }
+
+    // Check feature redundancy
+    if (appState.redundancyResults) {
+        const veryHigh = appState.redundancyResults.pairs.filter(p => !isNaN(p.absCorrelation) && p.absCorrelation >= 0.9);
+        if (veryHigh.length > 0) {
+            recommendations.push({
+                type: 'info',
+                message: `${veryHigh.length} feature pair(s) are highly redundant (≥0.9). Consider dropping one feature from each pair.`
+            });
+        }
+    }
+
+    // Check item similarity
+    if (appState.similarityResults) {
+        const validPairs = appState.similarityResults.pairs.filter(p => !isNaN(p.absCorrelation));
+        const avgSim = validPairs.length > 0 ?
+            validPairs.reduce((sum, p) => sum + p.absCorrelation, 0) / validPairs.length : 0;
+
+        if (avgSim > 0.6) {
+            recommendations.push({
+                type: 'info',
+                message: `High average item similarity (${avgSim.toFixed(3)}) may limit prediction performance. This could indicate limited diversity in your item set.`
+            });
+        }
+    }
+
+    if (recommendations.length === 0) {
+        recDiv.innerHTML = '<div class="note" style="color: #28a745;">✓ No major issues detected. Your dataset looks good for brain prediction modeling!</div>';
+    } else {
+        let html = '<div style="margin-top: 10px;">';
+        recommendations.forEach(rec => {
+            const icon = rec.type === 'warning' ? '⚠️' : 'ℹ️';
+            const color = rec.type === 'warning' ? '#dc3545' : '#0066cc';
+            html += `<div class="note" style="margin-bottom: 10px; border-left: 3px solid ${color};"><strong>${icon}</strong> ${rec.message}</div>`;
+        });
+        html += '</div>';
+        recDiv.innerHTML = html;
+    }
+}
+
+function handleDownloadFinalData() {
+    if (!appState.df || !appState.df.data) {
+        alert('No data loaded. Please load data first.');
+        return;
+    }
+
+    // Convert DataFrame back to CSV using PapaParse
+    const csv = Papa.unparse(appState.df.data);
+
+    // Create blob and download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${appState.year}_${appState.groupName}_final_cleaned.csv`);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+}
+
+function handleCopySummary() {
+    const items = appState.df.unique('itemName');
+    const features = appState.df.unique('featureName');
+    const raters = appState.df.unique('workerId');
+
+    let text = `Feature Analysis Summary - ${appState.year} ${appState.groupName}\n`;
+    text += `${'='.repeat(60)}\n\n`;
+
+    text += `Final Dataset:\n`;
+    text += `- Items: ${items.length}\n`;
+    text += `- Features: ${features.length}\n`;
+    text += `- Raters: ${raters.length}\n`;
+    text += `- Total Ratings: ${appState.df.length}\n\n`;
+
+    if (appState.excludedRaters.length > 0 || appState.excludedFeatures.length > 0) {
+        text += `Exclusions:\n`;
+        if (appState.excludedRaters.length > 0) {
+            text += `- Excluded Raters (${appState.excludedRaters.length}): ${appState.excludedRaters.join(', ')}\n`;
+        }
+        if (appState.excludedFeatures.length > 0) {
+            text += `- Excluded Features (${appState.excludedFeatures.length}): ${appState.excludedFeatures.join(', ')}\n`;
+        }
+        text += '\n';
+    }
+
+    if (appState.reliabilityResults) {
+        text += `Feature Reliability:\n`;
+        const excellent = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr >= 0.7).length;
+        const good = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr >= 0.5 && r.avgCorr < 0.7).length;
+        const fair = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr >= 0.3 && r.avgCorr < 0.5).length;
+        const poor = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr < 0.3).length;
+        text += `- Excellent (≥0.7): ${excellent}\n`;
+        text += `- Good (0.5-0.7): ${good}\n`;
+        text += `- Fair (0.3-0.5): ${fair}\n`;
+        text += `- Poor (<0.3): ${poor}\n\n`;
+    }
+
+    if (appState.agreementResults) {
+        const avgAgreement = nanmean(Object.values(appState.agreementResults.raterSummary));
+        text += `Rater Agreement:\n`;
+        text += `- Average: ${avgAgreement.toFixed(3)}\n\n`;
+    }
+
+    if (appState.redundancyResults) {
+        const veryHigh = appState.redundancyResults.pairs.filter(p => !isNaN(p.absCorrelation) && p.absCorrelation >= 0.9).length;
+        text += `Feature Redundancy:\n`;
+        text += `- Very High Pairs (≥0.9): ${veryHigh}\n\n`;
+    }
+
+    if (appState.similarityResults) {
+        const validPairs = appState.similarityResults.pairs.filter(p => !isNaN(p.absCorrelation));
+        const avgSim = validPairs.length > 0 ?
+            validPairs.reduce((sum, p) => sum + p.absCorrelation, 0) / validPairs.length : 0;
+        text += `Item Similarity:\n`;
+        text += `- Average: ${avgSim.toFixed(3)}\n\n`;
+    }
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Summary copied to clipboard!');
+    }).catch(err => {
+        console.error('Could not copy text: ', err);
+        alert('Could not copy to clipboard. Please copy manually from console.');
+        console.log(text);
+    });
 }
 
 // Initialize app when DOM is ready

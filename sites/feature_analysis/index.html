@@ -573,9 +573,35 @@
 
         <section class="step-section" id="step6">
             <div class="card">
-                <h2>Step 6: Make Decisions</h2>
-                <p><em>Coming soon...</em></p>
-                <div class="step-navigation">
+                <h2>Step 6: Summary & Export</h2>
+
+                <p class="explanation-text">
+                    Review your analysis results and export the final cleaned dataset for your brain prediction models.
+                </p>
+
+                <button id="generateSummaryBtn" class="btn-primary">Generate Summary</button>
+                <div id="summaryLoading" class="loading-indicator" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Generating summary...</p>
+                </div>
+
+                <div id="summaryResults" style="display: none; margin-top: 30px;">
+                    <h3>Analysis Summary</h3>
+                    <div id="summaryContent"></div>
+
+                    <h3 style="margin-top: 30px;">Final Dataset</h3>
+                    <div id="finalDatasetInfo"></div>
+
+                    <div style="margin-top: 20px;">
+                        <button id="downloadFinalDataBtn" class="btn-primary">Download Final Dataset (CSV)</button>
+                        <button id="copySummaryBtn" class="btn-secondary" style="margin-left: 10px;">Copy Summary to Clipboard</button>
+                    </div>
+
+                    <h3 style="margin-top: 30px;">Recommendations</h3>
+                    <div id="recommendationsContent"></div>
+                </div>
+
+                <div class="step-navigation" style="margin-top: 30px;">
                     <button id="step6Prev" class="btn-prev">← Previous</button>
                 </div>
             </div>
