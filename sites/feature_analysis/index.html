@@ -145,7 +145,7 @@
 
                 <div class="explanation">
                     <h3>What is Feature Reliability?</h3>
-                    <p><strong>Also known as "Inter-rater Agreement"</strong> in the literature, this measures how consistently different raters (humans and LLMs) agreed on each feature.</p>
+                    <p><strong>Also known as "Inter-rater Agreement"</strong>, this measures how consistently different raters (humans and LLMs) agreed on the ratings for each feature.</p>
 
                     <details>
                         <summary>How does it work?</summary>
@@ -165,9 +165,14 @@
                     </details>
 
                     <div class="note">
-                        <strong>Note on LLM Raters:</strong> LLM models may show different consistency patterns than humans.
-                        Deterministic LLMs (temperature=0) might have perfect self-consistency, while humans have natural variation.
-                        Both are valid - focus on overall agreement across all raters.
+                        <strong>Note on Feature Reliability:</strong>There are many possible sources of disagreement 
+                        between raters. Humans are often "noisy" reponders (the same person might answer the 
+                        same question differently at different times), while deterministic LLMs (temperature=0) might 
+                        have perfect self-consistency. So human-human, and human-LLM differences can arise just 
+                        due to "human noisyiness". But there can also be "real disagreements" between raters (whether human
+                        or LLM), and this too will decrease the relability of a feature. Whatever the source of variation,
+                        features that vary between raters are also like to vary amongst your brain subjects, and so 
+                        will tend to be less useful features for brain prediction.
                     </div>
                 </div>
 
@@ -227,11 +232,13 @@
 
                     <details>
                         <summary>How does it work?</summary>
+                        The goal is to give each rater a score indicating how well their ratings correlated with every other rater, on average.
                         <div class="explanation-detail">
-                            <p><strong>For each feature separately:</strong></p>
+                            <p><strong>For each rater_i:</strong></p>
                             <ol>
-                                <li>Correlate each rater's item ratings (60 items) with every other rater's item ratings</li>
-                                <li>For each rater, average their correlations with all other raters</li>
+                                <li>Take the ratings for each feature one at a time (60 ratings, one per item)</li>
+                                <li>Correlate rater_i's ratings with each other individual rater one by one</li>
+                                <li>Compute the average correlation for rater_i with each of the other raters on this feature</li>
                                 <li>This gives each rater an "agreement score" for this feature</li>
                             </ol>
                             <p><strong>Then across all features:</strong></p>
@@ -246,12 +253,12 @@
                     </details>
 
                     <div class="note">
-                        <strong>Note on LLM vs Human Raters:</strong> LLM models may show different agreement patterns:
+                        <strong>Note on LLM vs Human Raters:</strong> 
                         <ul>
-                            <li>LLMs with identical prompts may have near-perfect agreement</li>
-                            <li>Different LLM models may disagree systematically</li>
-                            <li>Human raters typically show more natural variation</li>
+                            <li>LLM models may show different agreement patterns because they are deterministic (no noise)</li>
+                            <li>However, differences in "training data" or "reasoning ability" may lead LLM models to disagree systematically</li>                            
                             <li>Low agreement between humans and LLMs isn't necessarily bad - it may reflect different valid perspectives</li>
+                            <li>While neither is necessarily more "objectively correct", since you are predicting human brain responses, when LLMs and humans disagree, the human judgments are probably more useful for your neural modeling.</li>
                         </ul>
                     </div>
                 </div>

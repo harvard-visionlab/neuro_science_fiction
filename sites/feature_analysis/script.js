@@ -294,6 +294,9 @@ async function handleLoadData() {
         }
 
         // Parse surrogate CSV
+        console.log('\n=== DIAGNOSTIC: Parsing surrogate CSV ===');
+        console.log('First 500 chars of CSV:', surrogateCsvText.substring(0, 500));
+
         const surrogateParsed = Papa.parse(surrogateCsvText, {
             header: true,
             dynamicTyping: true,
@@ -305,11 +308,63 @@ async function handleLoadData() {
         }
 
         const surrogateData = surrogateParsed.data;
+
+        console.log('CSV headers detected:', surrogateParsed.meta.fields);
+        console.log('First parsed row:', surrogateData[0]);
         console.log(`Loaded ${surrogateData.length} surrogate ratings`);
+
+        // Search for the problematic butterfly row in the raw CSV
+        console.log('\nSearching for butterfly in raw CSV...');
+        const butterflyLines = surrogateCsvText.split('\n').filter(line => line.includes('蝶'));
+        console.log(`Found ${butterflyLines.length} lines containing 蝶:`);
+        butterflyLines.forEach((line, i) => {
+            console.log(`  Line ${i + 1}: ${line}`);
+        });
+
+        console.log('=== END CSV PARSING DIAGNOSTIC ===\n');
+
+        // DIAGNOSTIC: Check unique items in each data source
+        console.log('\n=== DIAGNOSTIC: Checking unique items in data sources ===');
+
+        const humanItems = [...new Set(humanData.map(row => row.itemName))].sort();
+        console.log(`Human data unique items (${humanItems.length}):`, humanItems);
+
+        const surrogateItems = [...new Set(surrogateData.map(row => row.itemName))].sort();
+        console.log(`Surrogate data unique items (${surrogateItems.length}):`, surrogateItems);
+
+        // DIAGNOSTIC: Find all rows with the mystery character '蝶'
+        console.log('\n=== DIAGNOSTIC: Searching for 蝶 character ===');
+        const butterflyRows = surrogateData.filter(row => row.itemName === '蝶');
+        console.log(`Found ${butterflyRows.length} rows with itemName === '蝶'`);
+        if (butterflyRows.length > 0) {
+            console.log('Full row details:');
+            butterflyRows.forEach((row, i) => {
+                console.log(`  Row ${i + 1}:`, row);
+            });
+        }
+
+        // Also check for partial matches or similar strings
+        const suspiciousRows = surrogateData.filter(row =>
+            row.itemName && (
+                row.itemName.includes('蝶') ||
+                row.itemName.charCodeAt(0) > 127 // Non-ASCII characters
+            )
+        );
+        console.log(`Found ${suspiciousRows.length} rows with non-ASCII or butterfly-containing itemName`);
+        if (suspiciousRows.length > 0 && suspiciousRows.length !== butterflyRows.length) {
+            console.log('Suspicious rows:');
+            suspiciousRows.slice(0, 10).forEach((row, i) => {
+                console.log(`  Row ${i + 1}:`, row);
+            });
+        }
+        console.log('=== END BUTTERFLY SEARCH ===\n');
 
         // Merge human and surrogate data
         const allData = [...humanData, ...surrogateData];
         console.log(`Total ratings after merge: ${allData.length}`);
+
+        const mergedItems = [...new Set(allData.map(row => row.itemName))].sort();
+        console.log(`Merged data unique items (${mergedItems.length}):`, mergedItems);
 
         // Add workerType to each row
         allData.forEach(row => {
@@ -326,6 +381,38 @@ async function handleLoadData() {
         // Create DataFrame
         let df = createDataFrame(allData);
 
+        const dfItems = df.unique('itemName');
+        console.log(`DataFrame unique items after creation (${dfItems.length}):`, dfItems);
+
+        // DIAGNOSTIC: Check if 蝶 appears in DataFrame and find its rows
+        console.log('\n=== DIAGNOSTIC: Checking DataFrame for 蝶 ===');
+        const dfButterflyRows = df.data.filter(row => row.itemName === '蝶');
+        console.log(`Found ${dfButterflyRows.length} rows in DataFrame with itemName === '蝶'`);
+        if (dfButterflyRows.length > 0) {
+            console.log('DataFrame butterfly rows:');
+            dfButterflyRows.forEach((row, i) => {
+                console.log(`  Row ${i + 1}:`, row);
+            });
+        }
+
+        // Check all unique itemName values for unusual characters
+        const allItemNames = allData.map(row => row.itemName);
+        const itemNameCounts = {};
+        allItemNames.forEach(name => {
+            itemNameCounts[name] = (itemNameCounts[name] || 0) + 1;
+        });
+
+        console.log('\nItemName counts (first 10):');
+        Object.entries(itemNameCounts).slice(0, 10).forEach(([name, count]) => {
+            console.log(`  "${name}": ${count} rows (charCodes: ${[...name].map(c => c.charCodeAt(0)).join(', ')})`);
+        });
+
+        if (itemNameCounts['蝶']) {
+            console.log(`\n"蝶" appears ${itemNameCounts['蝶']} times in allData`);
+            console.log(`Character codes: ${[...'蝶'].map(c => c.charCodeAt(0)).join(', ')}`);
+        }
+        console.log('=== END DATAFRAME BUTTERFLY CHECK ===\n');
+
         // Filter out incomplete raters
         const filterResult = filterIncompleteRaters(df);
 
@@ -335,8 +422,15 @@ async function handleLoadData() {
         appState.maxCount = filterResult.maxCount;
         appState.raterCounts = filterResult.raterCounts;
 
+        const rawDfItems = appState.rawDf.unique('itemName');
+        console.log(`rawDf unique items after filtering incomplete raters (${rawDfItems.length}):`, rawDfItems);
+
         // Apply exclusions to get final filtered df
         applyExclusions();
+
+        const finalDfItems = appState.df.unique('itemName');
+        console.log(`Final df unique items after applying exclusions (${finalDfItems.length}):`, finalDfItems);
+        console.log('=== END DIAGNOSTIC ===\n');
 
         // Display summary and exclusion controls
         displayDataSummary();
@@ -365,6 +459,12 @@ function handleDownloadLoadedData() {
         alert('No data loaded. Please load data first.');
         return;
     }
+
+    // DIAGNOSTIC: Check what items are in the data being exported
+    console.log('\n=== DIAGNOSTIC: Download CSV ===');
+    const exportItems = [...new Set(appState.df.data.map(row => row.itemName))].sort();
+    console.log(`Items in df.data being exported (${exportItems.length}):`, exportItems);
+    console.log('=== END DIAGNOSTIC ===\n');
 
     // Convert DataFrame back to CSV using PapaParse
     const csv = Papa.unparse(appState.df.data);

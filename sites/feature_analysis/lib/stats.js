@@ -23,17 +23,38 @@ function std(arr) {
 }
 
 // Pearson correlation coefficient between two arrays
-function correlate(arr1, arr2) {
+function correlate(arr1, arr2, debug = false) {
     if (arr1.length !== arr2.length) {
         throw new Error('Arrays must have the same length');
     }
 
-    const n = arr1.length;
+    // Filter out pairs where either value is NaN
+    const validPairs = [];
+    for (let i = 0; i < arr1.length; i++) {
+        if (!isNaN(arr1[i]) && !isNaN(arr2[i]) &&
+            arr1[i] !== null && arr1[i] !== undefined &&
+            arr2[i] !== null && arr2[i] !== undefined) {
+            validPairs.push([arr1[i], arr2[i]]);
+        }
+    }
+
+    const n = validPairs.length;
+
+    if (debug) {
+        console.log('  correlate(): input length:', arr1.length);
+        console.log('  correlate(): valid pairs:', n);
+        console.log('  correlate(): filtered out:', arr1.length - n);
+    }
+
     if (n === 0) return NaN;
 
+    // Extract valid values
+    const valid1 = validPairs.map(p => p[0]);
+    const valid2 = validPairs.map(p => p[1]);
+
     // Calculate means
-    const mean1 = mean(arr1);
-    const mean2 = mean(arr2);
+    const mean1 = mean(valid1);
+    const mean2 = mean(valid2);
 
     // Calculate correlation
     let numerator = 0;
@@ -41,8 +62,8 @@ function correlate(arr1, arr2) {
     let sum2Sq = 0;
 
     for (let i = 0; i < n; i++) {
-        const diff1 = arr1[i] - mean1;
-        const diff2 = arr2[i] - mean2;
+        const diff1 = valid1[i] - mean1;
+        const diff2 = valid2[i] - mean2;
 
         numerator += diff1 * diff2;
         sum1Sq += diff1 * diff1;
@@ -51,9 +72,21 @@ function correlate(arr1, arr2) {
 
     const denominator = Math.sqrt(sum1Sq * sum2Sq);
 
-    if (denominator === 0) return NaN;
+    if (debug) {
+        console.log('  correlate(): mean1:', mean1, 'mean2:', mean2);
+        console.log('  correlate(): sum1Sq:', sum1Sq, 'sum2Sq:', sum2Sq);
+        console.log('  correlate(): denominator:', denominator);
+    }
 
-    return numerator / denominator;
+    if (denominator === 0) {
+        if (debug) console.log('  correlate(): ZERO DENOMINATOR - returning NaN');
+        return NaN;
+    }
+
+    const result = numerator / denominator;
+    if (debug) console.log('  correlate(): result:', result);
+
+    return result;
 }
 
 // Correlation matrix for a 2D array (rows are variables)
@@ -61,13 +94,19 @@ function corrcoef(matrix) {
     const n = matrix.length; // number of variables
     const corrMatrix = [];
 
+    console.log('corrcoef(): computing', n, 'x', n, 'correlation matrix');
+
     for (let i = 0; i < n; i++) {
         corrMatrix[i] = [];
         for (let j = 0; j < n; j++) {
             if (i === j) {
                 corrMatrix[i][j] = 1.0;
             } else {
-                corrMatrix[i][j] = correlate(matrix[i], matrix[j]);
+                const corr = correlate(matrix[i], matrix[j], i === 0 && j === 1); // debug first pair
+                corrMatrix[i][j] = corr;
+                if (isNaN(corr)) {
+                    console.log(`  WARNING: NaN correlation for variables ${i} vs ${j}`);
+                }
             }
         }
     }
@@ -201,6 +240,11 @@ function computeFeatureVsFeatureCorr(df) {
     const features = df.unique('featureName');
     const items = df.unique('itemName');
 
+    console.log('=== computeFeatureVsFeatureCorr ===');
+    console.log('Features:', features);
+    console.log('Items:', items);
+    console.log('Total ratings in df:', df.length);
+
     const featureMatrix = [];
 
     features.forEach(feature => {
@@ -209,14 +253,35 @@ function computeFeatureVsFeatureCorr(df) {
         items.forEach(item => {
             const subset = df.subset({ featureName: feature, itemName: item });
             // Average ratings across all raters for this feature-item combination
-            const ratings = subset.data.map(row => row.ratingScaled !== undefined ? row.ratingScaled : row.rating);
-            itemRatings.push(mean(ratings));
+            if (subset.data.length === 0) {
+                // No data for this feature-item combination (all raters excluded)
+                console.log(`  ${feature} x ${item}: NO DATA`);
+                itemRatings.push(NaN);
+            } else {
+                const ratings = subset.data.map(row => row.ratingScaled !== undefined ? row.ratingScaled : row.rating);
+                const avgRating = nanmean(ratings);
+                itemRatings.push(avgRating);
+            }
         });
+
+        console.log(`${feature}: ratings array (first 5):`, itemRatings.slice(0, 5));
+        console.log(`${feature}: has NaN?`, itemRatings.some(r => isNaN(r)));
+        console.log(`${feature}: all same value?`, itemRatings.every(r => r === itemRatings[0]));
+        console.log(`${feature}: variance:`, std(itemRatings.filter(r => !isNaN(r))));
 
         featureMatrix.push(itemRatings);
     });
 
+    console.log('Feature Matrix shape:', featureMatrix.length, 'x', featureMatrix[0].length);
+
     const featureVsFeature = corrcoef(featureMatrix);
+
+    console.log('Feature correlation matrix:');
+    features.forEach((f1, i) => {
+        features.forEach((f2, j) => {
+            console.log(`  ${f1} vs ${f2}: ${featureVsFeature[i][j]}`);
+        });
+    });
 
     return { featureMatrix, featureVsFeature };
 }
@@ -234,8 +299,13 @@ function computeItemVsItemCorr(df) {
         features.forEach(feature => {
             const subset = df.subset({ featureName: feature, itemName: item });
             // Average ratings across all raters for this item-feature combination
-            const ratings = subset.data.map(row => row.ratingScaled !== undefined ? row.ratingScaled : row.rating);
-            featureRatings.push(mean(ratings));
+            if (subset.data.length === 0) {
+                // No data for this item-feature combination (all raters excluded)
+                featureRatings.push(NaN);
+            } else {
+                const ratings = subset.data.map(row => row.ratingScaled !== undefined ? row.ratingScaled : row.rating);
+                featureRatings.push(nanmean(ratings));
+            }
         });
 
         itemMatrix.push(featureRatings);
