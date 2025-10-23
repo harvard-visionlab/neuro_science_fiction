@@ -146,15 +146,8 @@ function filterIncompleteRaters(df) {
     // Find max count (this should be the expected/complete count)
     const maxCount = Math.max(...Object.values(raterCounts));
 
-    console.log('Rater counts:', raterCounts);
-    console.log('Max count (expected complete dataset):', maxCount);
-
     // Identify incomplete raters (those with fewer than max)
     const droppedRaters = raters.filter(rater => raterCounts[rater] < maxCount);
-
-    if (droppedRaters.length > 0) {
-        console.log('Dropping incomplete raters:', droppedRaters);
-    }
 
     // Filter DataFrame - keep only raters with max count
     const filteredDf = df.filter(row => raterCounts[row.workerId] === maxCount);
@@ -213,7 +206,6 @@ function loadExclusions(year, groupName) {
             const exclusions = JSON.parse(saved);
             appState.excludedRaters = exclusions.excludedRaters || [];
             appState.excludedFeatures = exclusions.excludedFeatures || [];
-            console.log('Loaded exclusions from localStorage:', exclusions);
         } catch (e) {
             console.error('Error loading exclusions:', e);
             appState.excludedRaters = [];
@@ -232,7 +224,6 @@ function saveExclusions(year, groupName) {
         excludedFeatures: appState.excludedFeatures
     };
     localStorage.setItem(key, JSON.stringify(exclusions));
-    console.log('Saved exclusions to localStorage:', exclusions);
 }
 
 // Step 1: Load Data
@@ -247,7 +238,6 @@ async function handleLoadData() {
 
     // Standardize group name
     const groupName = standardizeGroupName(groupNameRaw);
-    console.log(`Standardized group name: "${groupNameRaw}" → "${groupName}"`);
 
     // Show loading
     loadingIndicator.style.display = 'block';
@@ -258,7 +248,6 @@ async function handleLoadData() {
     try {
         // Fetch surrogate (LLM) ratings from Lambda
         const surrogateUrl = `${GENERATE_CSV_URL}?year=${year}&groupName=${groupName}`;
-        console.log('Fetching surrogate ratings from:', surrogateUrl);
         const surrogateResponse = await fetch(surrogateUrl);
 
         if (!surrogateResponse.ok) {
@@ -269,7 +258,6 @@ async function handleLoadData() {
 
         // Fetch human ratings from scorsese server
         const humanUrl = `https://scorsese.wjh.harvard.edu/turk/experiments/nsf/survey/${groupName}/data`;
-        console.log('Fetching human ratings from:', humanUrl);
 
         let humanCsvText = '';
         let humanData = [];
@@ -284,19 +272,12 @@ async function handleLoadData() {
                     skipEmptyLines: true
                 });
                 humanData = humanParsed.data;
-                console.log(`Loaded ${humanData.length} human ratings`);
-            } else {
-                console.warn('Human ratings not found, using only surrogate ratings');
             }
         } catch (humanError) {
-            console.warn('Could not fetch human ratings:', humanError.message);
-            console.log('Continuing with surrogate ratings only');
+            // Silently continue with surrogate ratings only
         }
 
         // Parse surrogate CSV
-        console.log('\n=== DIAGNOSTIC: Parsing surrogate CSV ===');
-        console.log('First 500 chars of CSV:', surrogateCsvText.substring(0, 500));
-
         const surrogateParsed = Papa.parse(surrogateCsvText, {
             header: true,
             dynamicTyping: true,
@@ -309,62 +290,8 @@ async function handleLoadData() {
 
         const surrogateData = surrogateParsed.data;
 
-        console.log('CSV headers detected:', surrogateParsed.meta.fields);
-        console.log('First parsed row:', surrogateData[0]);
-        console.log(`Loaded ${surrogateData.length} surrogate ratings`);
-
-        // Search for the problematic butterfly row in the raw CSV
-        console.log('\nSearching for butterfly in raw CSV...');
-        const butterflyLines = surrogateCsvText.split('\n').filter(line => line.includes('蝶'));
-        console.log(`Found ${butterflyLines.length} lines containing 蝶:`);
-        butterflyLines.forEach((line, i) => {
-            console.log(`  Line ${i + 1}: ${line}`);
-        });
-
-        console.log('=== END CSV PARSING DIAGNOSTIC ===\n');
-
-        // DIAGNOSTIC: Check unique items in each data source
-        console.log('\n=== DIAGNOSTIC: Checking unique items in data sources ===');
-
-        const humanItems = [...new Set(humanData.map(row => row.itemName))].sort();
-        console.log(`Human data unique items (${humanItems.length}):`, humanItems);
-
-        const surrogateItems = [...new Set(surrogateData.map(row => row.itemName))].sort();
-        console.log(`Surrogate data unique items (${surrogateItems.length}):`, surrogateItems);
-
-        // DIAGNOSTIC: Find all rows with the mystery character '蝶'
-        console.log('\n=== DIAGNOSTIC: Searching for 蝶 character ===');
-        const butterflyRows = surrogateData.filter(row => row.itemName === '蝶');
-        console.log(`Found ${butterflyRows.length} rows with itemName === '蝶'`);
-        if (butterflyRows.length > 0) {
-            console.log('Full row details:');
-            butterflyRows.forEach((row, i) => {
-                console.log(`  Row ${i + 1}:`, row);
-            });
-        }
-
-        // Also check for partial matches or similar strings
-        const suspiciousRows = surrogateData.filter(row =>
-            row.itemName && (
-                row.itemName.includes('蝶') ||
-                row.itemName.charCodeAt(0) > 127 // Non-ASCII characters
-            )
-        );
-        console.log(`Found ${suspiciousRows.length} rows with non-ASCII or butterfly-containing itemName`);
-        if (suspiciousRows.length > 0 && suspiciousRows.length !== butterflyRows.length) {
-            console.log('Suspicious rows:');
-            suspiciousRows.slice(0, 10).forEach((row, i) => {
-                console.log(`  Row ${i + 1}:`, row);
-            });
-        }
-        console.log('=== END BUTTERFLY SEARCH ===\n');
-
         // Merge human and surrogate data
         const allData = [...humanData, ...surrogateData];
-        console.log(`Total ratings after merge: ${allData.length}`);
-
-        const mergedItems = [...new Set(allData.map(row => row.itemName))].sort();
-        console.log(`Merged data unique items (${mergedItems.length}):`, mergedItems);
 
         // Add workerType to each row
         allData.forEach(row => {
@@ -381,38 +308,6 @@ async function handleLoadData() {
         // Create DataFrame
         let df = createDataFrame(allData);
 
-        const dfItems = df.unique('itemName');
-        console.log(`DataFrame unique items after creation (${dfItems.length}):`, dfItems);
-
-        // DIAGNOSTIC: Check if 蝶 appears in DataFrame and find its rows
-        console.log('\n=== DIAGNOSTIC: Checking DataFrame for 蝶 ===');
-        const dfButterflyRows = df.data.filter(row => row.itemName === '蝶');
-        console.log(`Found ${dfButterflyRows.length} rows in DataFrame with itemName === '蝶'`);
-        if (dfButterflyRows.length > 0) {
-            console.log('DataFrame butterfly rows:');
-            dfButterflyRows.forEach((row, i) => {
-                console.log(`  Row ${i + 1}:`, row);
-            });
-        }
-
-        // Check all unique itemName values for unusual characters
-        const allItemNames = allData.map(row => row.itemName);
-        const itemNameCounts = {};
-        allItemNames.forEach(name => {
-            itemNameCounts[name] = (itemNameCounts[name] || 0) + 1;
-        });
-
-        console.log('\nItemName counts (first 10):');
-        Object.entries(itemNameCounts).slice(0, 10).forEach(([name, count]) => {
-            console.log(`  "${name}": ${count} rows (charCodes: ${[...name].map(c => c.charCodeAt(0)).join(', ')})`);
-        });
-
-        if (itemNameCounts['蝶']) {
-            console.log(`\n"蝶" appears ${itemNameCounts['蝶']} times in allData`);
-            console.log(`Character codes: ${[...'蝶'].map(c => c.charCodeAt(0)).join(', ')}`);
-        }
-        console.log('=== END DATAFRAME BUTTERFLY CHECK ===\n');
-
         // Filter out incomplete raters
         const filterResult = filterIncompleteRaters(df);
 
@@ -422,15 +317,8 @@ async function handleLoadData() {
         appState.maxCount = filterResult.maxCount;
         appState.raterCounts = filterResult.raterCounts;
 
-        const rawDfItems = appState.rawDf.unique('itemName');
-        console.log(`rawDf unique items after filtering incomplete raters (${rawDfItems.length}):`, rawDfItems);
-
         // Apply exclusions to get final filtered df
         applyExclusions();
-
-        const finalDfItems = appState.df.unique('itemName');
-        console.log(`Final df unique items after applying exclusions (${finalDfItems.length}):`, finalDfItems);
-        console.log('=== END DIAGNOSTIC ===\n');
 
         // Display summary and exclusion controls
         displayDataSummary();
@@ -459,12 +347,6 @@ function handleDownloadLoadedData() {
         alert('No data loaded. Please load data first.');
         return;
     }
-
-    // DIAGNOSTIC: Check what items are in the data being exported
-    console.log('\n=== DIAGNOSTIC: Download CSV ===');
-    const exportItems = [...new Set(appState.df.data.map(row => row.itemName))].sort();
-    console.log(`Items in df.data being exported (${exportItems.length}):`, exportItems);
-    console.log('=== END DIAGNOSTIC ===\n');
 
     // Convert DataFrame back to CSV using PapaParse
     const csv = Papa.unparse(appState.df.data);
@@ -497,9 +379,76 @@ function applyExclusions() {
 
     // Create new DataFrame from filtered data
     appState.df = createDataFrame(filteredData);
+}
 
-    console.log(`Applied exclusions: ${appState.excludedRaters.length} raters, ${appState.excludedFeatures.length} features excluded`);
-    console.log(`Filtered data: ${filteredData.length} rows`);
+// Check data integrity: ensure all raters rated same items for all features
+function checkDataIntegrity(df) {
+    const issues = [];
+    const warnings = [];
+
+    const raters = df.unique('workerId');
+    const features = df.unique('featureName');
+    const allItems = df.unique('itemName');
+
+    // Expected count: 60 items per feature
+    const expectedItemCount = 60;
+
+    // Check each rater
+    raters.forEach(rater => {
+        const raterData = df.subset({ workerId: rater });
+        const raterItems = raterData.unique('itemName');
+
+        // Check if rater has all items
+        if (raterItems.length !== expectedItemCount) {
+            issues.push({
+                type: 'missing_items',
+                rater: rater,
+                expected: expectedItemCount,
+                actual: raterItems.length,
+                message: `${rater}: Rated ${raterItems.length} items (expected ${expectedItemCount})`
+            });
+        }
+
+        // Check if rater has same items as others
+        const missingItems = allItems.filter(item => !raterItems.includes(item));
+        if (missingItems.length > 0) {
+            issues.push({
+                type: 'item_mismatch',
+                rater: rater,
+                missingItems: missingItems,
+                message: `${rater}: Missing ${missingItems.length} items: ${missingItems.slice(0, 3).join(', ')}${missingItems.length > 3 ? '...' : ''}`
+            });
+        }
+
+        // Check each feature for this rater
+        features.forEach(feature => {
+            const featureData = df.subset({ workerId: rater, featureName: feature });
+            const featureItems = featureData.unique('itemName');
+
+            if (featureItems.length !== expectedItemCount) {
+                warnings.push({
+                    type: 'feature_incomplete',
+                    rater: rater,
+                    feature: feature,
+                    expected: expectedItemCount,
+                    actual: featureItems.length,
+                    message: `${rater} / ${feature}: ${featureItems.length} items (expected ${expectedItemCount})`
+                });
+            }
+        });
+    });
+
+    return {
+        passed: issues.length === 0,
+        issues: issues,
+        warnings: warnings,
+        summary: {
+            totalRaters: raters.length,
+            totalFeatures: features.length,
+            totalItems: allItems.length,
+            expectedItems: expectedItemCount
+        }
+    };
 }
 
 // Invalidate all analysis results (Steps 2-5)
@@ -699,6 +648,9 @@ function displayDataSummary() {
     // Display dropped raters if any
     displayDroppedRaters();
 
+    // Run and display integrity checks
+    displayIntegrityCheck();
+
     // Display rater breakdown
     displayRaterBreakdown(raters);
 
@@ -740,6 +692,65 @@ function displayDroppedRaters() {
     } else {
         droppedRatersSection.style.display = 'none';
     }
+}
+
+function displayIntegrityCheck() {
+    const integritySection = document.getElementById('integrityCheckSection');
+    const integrityResults = document.getElementById('integrityResults');
+
+    if (!integritySection || !integrityResults) {
+        // Create section if it doesn't exist
+        const section = document.createElement('div');
+        section.id = 'integrityCheckSection';
+        section.className = 'note';
+        section.style.marginTop = '20px';
+        section.innerHTML = '<h3>Data Integrity Check</h3><div id="integrityResults"></div>';
+
+        // Insert after droppedRatersSection
+        const droppedSection = document.getElementById('droppedRatersSection');
+        if (droppedSection) {
+            droppedSection.parentNode.insertBefore(section, droppedSection.nextSibling);
+        }
+    }
+
+    // Run integrity check
+    const integrity = checkDataIntegrity(appState.df);
+    const resultsDiv = document.getElementById('integrityResults');
+
+    if (integrity.passed) {
+        resultsDiv.innerHTML = `
+            <div style="color: #28a745; font-weight: bold;">✓ All checks passed</div>
+            <div style="font-size: 0.9em; margin-top: 5px;">
+                All ${integrity.summary.totalRaters} raters have complete ratings for
+                ${integrity.summary.expectedItems} items across ${integrity.summary.totalFeatures} features.
+            </div>
+        `;
+    } else {
+        let html = '<div style="color: #dc3545; font-weight: bold;">⚠ Data integrity issues detected</div>';
+
+        if (integrity.issues.length > 0) {
+            html += '<div style="margin-top: 10px;"><strong>Issues:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
+            integrity.issues.forEach(issue => {
+                html += `<li>${issue.message}</li>`;
+            });
+            html += '</ul></div>';
+        }
+
+        if (integrity.warnings.length > 0 && integrity.warnings.length <= 10) {
+            html += '<div style="margin-top: 10px;"><strong>Warnings:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
+            integrity.warnings.slice(0, 10).forEach(warning => {
+                html += `<li style="font-size: 0.9em;">${warning.message}</li>`;
+            });
+            if (integrity.warnings.length > 10) {
+                html += `<li style="font-size: 0.9em; font-style: italic;">... and ${integrity.warnings.length - 10} more warnings</li>`;
+            }
+            html += '</ul></div>';
+        }
+
+        resultsDiv.innerHTML = html;
+    }
+
+    document.getElementById('integrityCheckSection').style.display = 'block';
 }
 
 function displayRaterBreakdown(raters) {

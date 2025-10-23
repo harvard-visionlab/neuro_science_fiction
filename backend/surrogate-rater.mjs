@@ -246,6 +246,108 @@ function parseChecklistOptions(checklistOptions) {
   }).filter(item => item !== null);
 }
 
+// ============================================================================
+// NEW VALIDATION CODE - Added 2025-10-22
+// Validates LLM ratings to prevent invalid nouns (e.g., "蝶" instead of "butterfly")
+// ============================================================================
+function validateRatings(ratings, type, scaleOptions, checklistOptions) {
+  const errors = [];
+  const warnings = [];
+
+  // 1. Check count
+  if (ratings.length !== 60) {
+    errors.push(`Expected 60 ratings, got ${ratings.length}`);
+  }
+
+  // 2. Normalize and validate nouns
+  const nounsLowercase = NOUNS.map(n => n.toLowerCase());
+  const ratedNouns = new Set();
+  const invalidNouns = [];
+  const correctedRatings = [];
+
+  ratings.forEach((rating, index) => {
+    const originalNoun = rating.noun;
+    const normalizedNoun = originalNoun.toLowerCase();
+
+    // Check if noun is valid (case-insensitive)
+    if (!nounsLowercase.includes(normalizedNoun)) {
+      invalidNouns.push(originalNoun);
+      return; // Don't add to correctedRatings
+    }
+
+    // Find the correct casing from NOUNS array
+    const correctNoun = NOUNS.find(n => n.toLowerCase() === normalizedNoun);
+
+    // Auto-correct case if needed
+    const correctedRating = { ...rating, noun: correctNoun };
+    if (originalNoun !== correctNoun) {
+      warnings.push(`Auto-corrected noun casing: "${originalNoun}" → "${correctNoun}"`);
+    }
+
+    // Check for duplicates
+    if (ratedNouns.has(correctNoun)) {
+      errors.push(`Duplicate rating for noun: "${correctNoun}"`);
+    }
+    ratedNouns.add(correctNoun);
+
+    correctedRatings.push(correctedRating);
+  });
+
+  // 3. Check for missing nouns
+  const missingNouns = NOUNS.filter(noun => !ratedNouns.has(noun));
+  if (missingNouns.length > 0) {
+    errors.push(`Missing ratings for ${missingNouns.length} noun(s): ${missingNouns.join(', ')}`);
+  }
+
+  // 4. Report invalid nouns
+  if (invalidNouns.length > 0) {
+    errors.push(`Invalid nouns (not in NOUNS array): ${invalidNouns.join(', ')}`);
+  }
+
+  // 5. Validate response values by type
+  if (type === 'yesno') {
+    correctedRatings.forEach((rating, index) => {
+      if (rating.response !== 'yes' && rating.response !== 'no') {
+        errors.push(`Rating ${index + 1} (${rating.noun}): Invalid yes/no response: "${rating.response}"`);
+      }
+    });
+  } else if (type === 'scale') {
+    const bounds = parseScaleBounds(scaleOptions);
+    correctedRatings.forEach((rating, index) => {
+      const val = rating.response;
+      if (typeof val !== 'number' || !Number.isInteger(val) || isNaN(val) || val < bounds.min || val > bounds.max) {
+        errors.push(`Rating ${index + 1} (${rating.noun}): Invalid scale value ${val}, must be integer ${bounds.min}-${bounds.max}`);
+      }
+    });
+  } else if (type === 'checklist') {
+    const options = parseChecklistOptions(checklistOptions);
+    const validIndices = options.map(o => o.index);
+    correctedRatings.forEach((rating, index) => {
+      if (!Array.isArray(rating.selected)) {
+        errors.push(`Rating ${index + 1} (${rating.noun}): 'selected' must be an array`);
+      } else {
+        rating.selected.forEach(idx => {
+          if (typeof idx !== 'number' || isNaN(idx) || !Number.isInteger(idx)) {
+            errors.push(`Rating ${index + 1} (${rating.noun}): Checklist index must be an integer, got ${idx}`);
+          } else if (!validIndices.includes(idx)) {
+            errors.push(`Rating ${index + 1} (${rating.noun}): Invalid checklist index ${idx}, valid indices are [${validIndices.join(', ')}]`);
+          }
+        });
+      }
+    });
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    correctedRatings // Always return correctedRatings (even if invalid, for debugging)
+  };
+}
+// ============================================================================
+// END NEW VALIDATION CODE
+// ============================================================================
+
 function convertRatingDataToCsv(ratingData) {
   const { input, ratings } = ratingData;
   const { year, groupName, featureName, workerId, type, scaleOptions, checklistOptions } = input;
@@ -463,7 +565,47 @@ export const handler = async (event) => {
     }
     
     const duration = Date.now() - startTime;
-    
+
+    // ============================================================================
+    // NEW: Validate ratings before saving to S3
+    // ============================================================================
+    console.log('Validating LLM ratings...');
+    const validation = validateRatings(ratings, type, scaleOptions, checklistOptions);
+
+    if (!validation.valid) {
+      console.error('Validation failed:', validation.errors);
+      return {
+        statusCode: 422,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          error: 'Invalid ratings from LLM',
+          validationErrors: validation.errors,
+          details: {
+            year,
+            groupName,
+            featureName,
+            workerId: modelName,
+            ratingsReceived: ratings.length,
+            expectedRatings: 60
+          },
+          message: 'LLM returned invalid data. Please regenerate with forceRegenerate=true.'
+        })
+      };
+    }
+
+    // Log warnings (if any case corrections were made)
+    if (validation.warnings.length > 0) {
+      console.log('Validation warnings:', validation.warnings);
+    }
+
+    // Use corrected ratings (with normalized casing)
+    const correctedRatings = validation.correctedRatings;
+    // ============================================================================
+    // END NEW VALIDATION CODE
+    // ============================================================================
+
     const result = {
       input: {
         year,
@@ -476,12 +618,13 @@ export const handler = async (event) => {
         scaleOptions: scaleOptions || null,
         checklistOptions: checklistOptions || null
       },
-      ratings,
+      ratings: correctedRatings, // NEW: Use validated/corrected ratings
       metadata: {
         timestamp: new Date().toISOString(),
         model: config.model,
         duration: `${duration}ms`,
-        nounsRated: ratings.length
+        nounsRated: correctedRatings.length,
+        validationWarnings: validation.warnings.length > 0 ? validation.warnings : undefined // NEW: Include warnings if any
       }
     };
     
@@ -524,7 +667,7 @@ export const handler = async (event) => {
           groupName,
           featureName,
           workerId: modelName,
-          nounsRated: ratings.length,
+          nounsRated: correctedRatings.length,
           duration: `${duration}ms`
         },
         data: result

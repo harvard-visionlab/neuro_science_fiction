@@ -94,19 +94,14 @@ function corrcoef(matrix) {
     const n = matrix.length; // number of variables
     const corrMatrix = [];
 
-    console.log('corrcoef(): computing', n, 'x', n, 'correlation matrix');
-
     for (let i = 0; i < n; i++) {
         corrMatrix[i] = [];
         for (let j = 0; j < n; j++) {
             if (i === j) {
                 corrMatrix[i][j] = 1.0;
             } else {
-                const corr = correlate(matrix[i], matrix[j], i === 0 && j === 1); // debug first pair
+                const corr = correlate(matrix[i], matrix[j], false);
                 corrMatrix[i][j] = corr;
-                if (isNaN(corr)) {
-                    console.log(`  WARNING: NaN correlation for variables ${i} vs ${j}`);
-                }
             }
         }
     }
@@ -240,11 +235,6 @@ function computeFeatureVsFeatureCorr(df) {
     const features = df.unique('featureName');
     const items = df.unique('itemName');
 
-    console.log('=== computeFeatureVsFeatureCorr ===');
-    console.log('Features:', features);
-    console.log('Items:', items);
-    console.log('Total ratings in df:', df.length);
-
     const featureMatrix = [];
 
     features.forEach(feature => {
@@ -255,7 +245,6 @@ function computeFeatureVsFeatureCorr(df) {
             // Average ratings across all raters for this feature-item combination
             if (subset.data.length === 0) {
                 // No data for this feature-item combination (all raters excluded)
-                console.log(`  ${feature} x ${item}: NO DATA`);
                 itemRatings.push(NaN);
             } else {
                 const ratings = subset.data.map(row => row.ratingScaled !== undefined ? row.ratingScaled : row.rating);
@@ -264,24 +253,10 @@ function computeFeatureVsFeatureCorr(df) {
             }
         });
 
-        console.log(`${feature}: ratings array (first 5):`, itemRatings.slice(0, 5));
-        console.log(`${feature}: has NaN?`, itemRatings.some(r => isNaN(r)));
-        console.log(`${feature}: all same value?`, itemRatings.every(r => r === itemRatings[0]));
-        console.log(`${feature}: variance:`, std(itemRatings.filter(r => !isNaN(r))));
-
         featureMatrix.push(itemRatings);
     });
 
-    console.log('Feature Matrix shape:', featureMatrix.length, 'x', featureMatrix[0].length);
-
     const featureVsFeature = corrcoef(featureMatrix);
-
-    console.log('Feature correlation matrix:');
-    features.forEach((f1, i) => {
-        features.forEach((f2, j) => {
-            console.log(`  ${f1} vs ${f2}: ${featureVsFeature[i][j]}`);
-        });
-    });
 
     return { featureMatrix, featureVsFeature };
 }
