@@ -79,7 +79,6 @@ const generateSummaryBtn = document.getElementById('generateSummaryBtn');
 const summaryLoading = document.getElementById('summaryLoading');
 const summaryResults = document.getElementById('summaryResults');
 const downloadFinalDataBtn = document.getElementById('downloadFinalDataBtn');
-const copySummaryBtn = document.getElementById('copySummaryBtn');
 
 // Initialize app
 function init() {
@@ -130,7 +129,6 @@ function setupEventListeners() {
     // Step 6
     generateSummaryBtn.addEventListener('click', handleGenerateSummary);
     downloadFinalDataBtn.addEventListener('click', handleDownloadFinalData);
-    copySummaryBtn.addEventListener('click', handleCopySummary);
 
     // Navigation buttons for other steps
     document.getElementById('step2Prev').addEventListener('click', () => navigateToStep(1));
@@ -2209,6 +2207,12 @@ async function handleGenerateSummary() {
             summaryLoading.style.display = 'none';
             summaryResults.style.display = 'block';
 
+            // Mark step 6 as complete
+            const progressSteps = document.querySelectorAll('.progress-step');
+            if (progressSteps[5]) { // index 5 = step 6
+                progressSteps[5].classList.add('completed');
+            }
+
         } catch (error) {
             console.error('Error generating summary:', error);
             alert(`Error generating summary: ${error.message}`);
@@ -2233,11 +2237,18 @@ function displaySummaryResults() {
         const fair = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr >= 0.3 && r.avgCorr < 0.5).length;
         const poor = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr < 0.3).length;
 
+        const total = excellent + good + fair + poor;
+        const excellentPercent = total > 0 ? excellent / total : 0;
+
+        // Green intensity based on percentage excellent (0.3 = light green, 1.0 = dark green)
+        const greenIntensity = 0.3 + (excellentPercent * 0.7);
+        const excellentColor = `rgba(40, 167, 69, ${greenIntensity})`;
+
         html += `
             <div class="summary-item">
                 <div class="summary-label">Feature Reliability</div>
                 <div class="summary-value" style="font-size: 0.9em; text-align: left;">
-                    • ${excellent} excellent<br>
+                    • <span style="color: ${excellentColor}; font-weight: 600;">${excellent} excellent</span><br>
                     • ${good} good<br>
                     • ${fair} fair<br>
                     • ${poor} poor
@@ -2249,10 +2260,25 @@ function displaySummaryResults() {
     // Step 3: Rater Agreement
     if (appState.agreementResults) {
         const avgAgreement = nanmean(Object.values(appState.agreementResults.raterSummary));
+
+        // Graded color: high is good (green), low is bad (red)
+        let agreementColor = '';
+        if (avgAgreement >= 0.7) {
+            agreementColor = '#28a745'; // Green
+        } else if (avgAgreement >= 0.5) {
+            agreementColor = '#20c997'; // Teal
+        } else if (avgAgreement >= 0.3) {
+            agreementColor = '#ffc107'; // Yellow
+        } else if (avgAgreement >= 0.2) {
+            agreementColor = '#fd7e14'; // Orange
+        } else {
+            agreementColor = '#dc3545'; // Red
+        }
+
         html += `
             <div class="summary-item">
                 <div class="summary-label">Avg Rater Agreement</div>
-                <div class="summary-value">${avgAgreement.toFixed(3)}</div>
+                <div class="summary-value" style="color: ${agreementColor}; font-weight: 600;">${avgAgreement.toFixed(3)}</div>
             </div>
         `;
     }
@@ -2262,11 +2288,25 @@ function displaySummaryResults() {
         const veryHigh = appState.redundancyResults.pairs.filter(p => !isNaN(p.rSquared) && p.rSquared >= 0.81).length;
         const moderate = appState.redundancyResults.pairs.filter(p => !isNaN(p.rSquared) && p.rSquared >= 0.49 && p.rSquared < 0.81).length;
 
+        // Graded color for very high redundancy (fewer is better)
+        let veryHighColor = '';
+        if (veryHigh === 0) {
+            veryHighColor = '#28a745'; // Green - no redundancy
+        } else if (veryHigh <= 2) {
+            veryHighColor = '#20c997'; // Teal - very few
+        } else if (veryHigh <= 5) {
+            veryHighColor = '#ffc107'; // Yellow - some
+        } else if (veryHigh <= 10) {
+            veryHighColor = '#fd7e14'; // Orange - many
+        } else {
+            veryHighColor = '#dc3545'; // Red - too many
+        }
+
         html += `
             <div class="summary-item">
                 <div class="summary-label">Redundant Feature Pairs</div>
                 <div class="summary-value" style="font-size: 0.9em; text-align: left;">
-                    • ${veryHigh} very high (r² ≥ 0.81)<br>
+                    • <span style="color: ${veryHighColor}; font-weight: 600;">${veryHigh} very high (r² ≥ 0.81)</span><br>
                     • ${moderate} moderate (r² 0.49-0.81)
                 </div>
             </div>
@@ -2279,10 +2319,24 @@ function displaySummaryResults() {
         const avgSim = validPairs.length > 0 ?
             validPairs.reduce((sum, p) => sum + p.absCorrelation, 0) / validPairs.length : 0;
 
+        // Graded color: lower similarity is better (more diverse items)
+        let simColor = '';
+        if (avgSim < 0.3) {
+            simColor = '#28a745'; // Green - very diverse
+        } else if (avgSim < 0.5) {
+            simColor = '#20c997'; // Teal - good diversity
+        } else if (avgSim < 0.6) {
+            simColor = '#ffc107'; // Yellow - moderate
+        } else if (avgSim < 0.7) {
+            simColor = '#fd7e14'; // Orange - concerning
+        } else {
+            simColor = '#dc3545'; // Red - very similar
+        }
+
         html += `
             <div class="summary-item">
                 <div class="summary-label">Avg Item Similarity</div>
-                <div class="summary-value">${avgSim.toFixed(3)}</div>
+                <div class="summary-value" style="color: ${simColor}; font-weight: 600;">${avgSim.toFixed(3)}</div>
             </div>
         `;
     }
@@ -2424,73 +2478,6 @@ function handleDownloadFinalData() {
     document.body.removeChild(link);
 
     URL.revokeObjectURL(url);
-}
-
-function handleCopySummary() {
-    const items = appState.df.unique('itemName');
-    const features = appState.df.unique('featureName');
-    const raters = appState.df.unique('workerId');
-
-    let text = `Feature Analysis Summary - ${appState.year} ${appState.groupName}\n`;
-    text += `${'='.repeat(60)}\n\n`;
-
-    text += `Final Dataset:\n`;
-    text += `- Items: ${items.length}\n`;
-    text += `- Features: ${features.length}\n`;
-    text += `- Raters: ${raters.length}\n`;
-    text += `- Total Ratings: ${appState.df.length}\n\n`;
-
-    if (appState.excludedRaters.length > 0 || appState.excludedFeatures.length > 0) {
-        text += `Exclusions:\n`;
-        if (appState.excludedRaters.length > 0) {
-            text += `- Excluded Raters (${appState.excludedRaters.length}): ${appState.excludedRaters.join(', ')}\n`;
-        }
-        if (appState.excludedFeatures.length > 0) {
-            text += `- Excluded Features (${appState.excludedFeatures.length}): ${appState.excludedFeatures.join(', ')}\n`;
-        }
-        text += '\n';
-    }
-
-    if (appState.reliabilityResults) {
-        text += `Feature Reliability:\n`;
-        const excellent = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr >= 0.7).length;
-        const good = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr >= 0.5 && r.avgCorr < 0.7).length;
-        const fair = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr >= 0.3 && r.avgCorr < 0.5).length;
-        const poor = appState.reliabilityResults.filter(r => !isNaN(r.avgCorr) && r.avgCorr < 0.3).length;
-        text += `- Excellent (≥0.7): ${excellent}\n`;
-        text += `- Good (0.5-0.7): ${good}\n`;
-        text += `- Fair (0.3-0.5): ${fair}\n`;
-        text += `- Poor (<0.3): ${poor}\n\n`;
-    }
-
-    if (appState.agreementResults) {
-        const avgAgreement = nanmean(Object.values(appState.agreementResults.raterSummary));
-        text += `Rater Agreement:\n`;
-        text += `- Average: ${avgAgreement.toFixed(3)}\n\n`;
-    }
-
-    if (appState.redundancyResults) {
-        const veryHigh = appState.redundancyResults.pairs.filter(p => !isNaN(p.absCorrelation) && p.absCorrelation >= 0.9).length;
-        text += `Feature Redundancy:\n`;
-        text += `- Very High Pairs (≥0.9): ${veryHigh}\n\n`;
-    }
-
-    if (appState.similarityResults) {
-        const validPairs = appState.similarityResults.pairs.filter(p => !isNaN(p.absCorrelation));
-        const avgSim = validPairs.length > 0 ?
-            validPairs.reduce((sum, p) => sum + p.absCorrelation, 0) / validPairs.length : 0;
-        text += `Item Similarity:\n`;
-        text += `- Average: ${avgSim.toFixed(3)}\n\n`;
-    }
-
-    // Copy to clipboard
-    navigator.clipboard.writeText(text).then(() => {
-        alert('Summary copied to clipboard!');
-    }).catch(err => {
-        console.error('Could not copy text: ', err);
-        alert('Could not copy to clipboard. Please copy manually from console.');
-        console.log(text);
-    });
 }
 
 // Initialize app when DOM is ready

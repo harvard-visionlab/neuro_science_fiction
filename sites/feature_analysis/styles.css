@@ -104,6 +104,7 @@ h4 {
 .progress-step.completed .step-number {
     background: #28a745;
     color: white;
+    cursor: pointer;
 }
 
 .step-label {
