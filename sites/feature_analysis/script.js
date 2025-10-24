@@ -25,7 +25,8 @@ let appState = {
     redundancyThresholdValue: 0.5,
     similarityResults: null,
     similarityChart: null,
-    similarityThresholdValue: 0.7
+    similarityThresholdValue: 0.7,
+    topPairsCount: 20
 };
 
 // DOM Elements - Step 1
@@ -69,6 +70,7 @@ const similarityResults = document.getElementById('similarityResults');
 const step5Next = document.getElementById('step5Next');
 const similarityThreshold = document.getElementById('similarityThreshold');
 const similarityThresholdValue = document.getElementById('similarityThresholdValue');
+const topPairsCount = document.getElementById('topPairsCount');
 const downloadSimilarityHeatmap = document.getElementById('downloadSimilarityHeatmap');
 const downloadSimilarityChart = document.getElementById('downloadSimilarityChart');
 
@@ -120,6 +122,7 @@ function setupEventListeners() {
     // Step 5
     computeSimilarityBtn.addEventListener('click', handleComputeSimilarity);
     similarityThreshold.addEventListener('input', handleSimilarityThresholdChange);
+    topPairsCount.addEventListener('input', handleTopPairsCountChange);
     downloadSimilarityHeatmap.addEventListener('click', handleDownloadSimilarityHeatmap);
     downloadSimilarityChart.addEventListener('click', handleDownloadSimilarityChart);
     step5Next.addEventListener('click', () => navigateToStep(6));
@@ -1941,11 +1944,48 @@ function updateSimilaritySummary() {
     </div>`;
     html += '</div>';
 
+    // Brain Prediction Impact Assessment
+    const totalPairs = pairs.length;
+    const estimatedCeiling = totalPairs > 0
+        ? Math.round((totalPairs - veryHighPairs.length) / totalPairs * 100)
+        : 100;
+
+    let gradeLabel = '';
+    let gradeDescription = '';
+    let gradeColor = '';
+
+    if (estimatedCeiling > 90) {
+        gradeLabel = 'Fantastic';
+        gradeDescription = 'Excellent item diversity';
+        gradeColor = '#28a745'; // Green
+    } else if (estimatedCeiling > 80) {
+        gradeLabel = 'Great';
+        gradeDescription = 'Good stimulus set';
+        gradeColor = '#20c997'; // Teal
+    } else if (estimatedCeiling > 70) {
+        gradeLabel = 'Solid';
+        gradeDescription = 'Reasonable coverage';
+        gradeColor = '#ffc107'; // Yellow
+    } else if (estimatedCeiling > 60) {
+        gradeLabel = 'OK';
+        gradeDescription = 'Some concerns about item distinguishability';
+        gradeColor = '#fd7e14'; // Orange
+    } else {
+        gradeLabel = 'Challenging';
+        gradeDescription = 'Many confusable items';
+        gradeColor = '#dc3545'; // Red
+    }
+
+    html += '<div class="note" style="margin-top: 20px; border-left: 4px solid ' + gradeColor + ';">';
+    html += '<h4 style="margin-top: 0; color: ' + gradeColor + ';">Brain Prediction Impact: ' + gradeLabel + '</h4>';
+    html += '<p style="margin-bottom: 0;"><strong>' + gradeDescription + '</strong></p>';
+    html += '</div>';
+
     if (veryHighPairs.length > 0) {
         html += '<div class="note" style="margin-top: 20px;">';
         html += '<strong>⚠️ Note:</strong> You have ' + veryHighPairs.length + ' item pair(s) with very high similarity (≥ 0.9). ';
         html += 'This suggests some items may be confusable, which can limit prediction performance. ';
-        html += 'This could be a limitation of your item set — Perhaps the brain responses are in fact indistinguishable. ';
+        html += 'This could be a limitation of your item set — perhaps the brain responses are in fact indistinguishable. ';
         html += 'Alternatively, this could be a limitation of your feature set (you need to choose features that better distinguish the items).';
         html += '</div>';
     }
@@ -1957,11 +1997,17 @@ function createSimilarityTable() {
     const tableDiv = document.getElementById('similarityTable');
     const { pairs } = appState.similarityResults;
 
-    // Show top 20 most similar pairs
-    const topPairs = pairs.slice(0, 20);
+    // Show top N most similar pairs (based on user selection)
+    const count = Math.min(appState.topPairsCount, pairs.length);
+    const topPairs = pairs.slice(0, count);
 
-    let html = '<h4>Top 20 Most Similar Item Pairs</h4>';
-    html += '<table><thead><tr>';
+    // Update the summary text in the details tag
+    const summaryElement = document.getElementById('similarityTableSummary');
+    if (summaryElement) {
+        summaryElement.textContent = `View Top ${count} Most Similar Pairs`;
+    }
+
+    let html = '<table><thead><tr>';
     html += '<th>Rank</th>';
     html += '<th>Item 1</th>';
     html += '<th>Item 2</th>';
@@ -2110,6 +2156,16 @@ function handleSimilarityThresholdChange(event) {
     if (appState.similarityResults) {
         createSimilarityChart();
         updateSimilaritySummary();
+    }
+}
+
+function handleTopPairsCountChange(event) {
+    const newCount = parseInt(event.target.value, 10);
+    appState.topPairsCount = newCount;
+
+    // Update table if results exist
+    if (appState.similarityResults) {
+        createSimilarityTable();
     }
 }
 

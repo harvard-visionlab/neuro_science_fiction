@@ -546,8 +546,23 @@
                             <p class="explanation-text">
                                 Item pairs sorted by correlation (highest first). These items have the most similar feature profiles.
                             </p>
+
+                            <div class="threshold-control">
+                                <label for="topPairsCount">
+                                    <strong>Number of Pairs to Display:</strong>
+                                </label>
+                                <input
+                                    type="number"
+                                    id="topPairsCount"
+                                    min="1"
+                                    max="1000"
+                                    step="1"
+                                    value="20"
+                                >
+                            </div>
+
                             <details class="data-table-section">
-                                <summary>View Top 20 Most Similar Pairs</summary>
+                                <summary id="similarityTableSummary">View Top 20 Most Similar Pairs</summary>
                                 <div id="similarityTable"></div>
                             </details>
                         </div>
