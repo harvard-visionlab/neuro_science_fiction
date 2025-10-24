@@ -1348,10 +1348,10 @@ function createAgreementDetailTable() {
         </p>`;
     }
 
-    html += '<table style="width: 80%;"><thead><tr>';
-    html += '<th style="width: 35%;">Feature</th>';
-    html += '<th style="width: 35%;">Rater</th>';
-    html += '<th style="width: 30%;">Avg Correlation</th>';
+    html += '<table><thead><tr>';
+    html += '<th>Feature</th>';
+    html += '<th>Rater</th>';
+    html += '<th>Avg Correlation</th>';
     html += '</tr></thead><tbody>';
 
     validResults.forEach(row => {

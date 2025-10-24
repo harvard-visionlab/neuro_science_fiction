@@ -5,7 +5,8 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+        Ubuntu, Cantarell, sans-serif;
     line-height: 1.6;
     color: #333;
     background: #f5f5f5;
@@ -23,7 +24,7 @@ header {
     padding: 30px 20px;
     background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 h1 {
@@ -63,7 +64,7 @@ h4 {
     background: white;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .progress-step {
@@ -126,8 +127,14 @@ h4 {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .card {
@@ -135,7 +142,7 @@ h4 {
     padding: 30px;
     margin-bottom: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .step-header {
@@ -183,6 +190,11 @@ h4 {
     padding: 12px 15px;
     border-radius: 4px;
     margin-top: 15px;
+}
+
+.note ul {
+    margin-left: 5px;
+    padding-left: 10px;
 }
 
 details {
@@ -237,7 +249,10 @@ details[open] summary {
 }
 
 /* Buttons */
-.btn-primary, .btn-next, .btn-prev, .btn-download {
+.btn-primary,
+.btn-next,
+.btn-prev,
+.btn-download {
     padding: 12px 24px;
     border: none;
     border-radius: 6px;
@@ -255,7 +270,7 @@ details[open] summary {
 .btn-primary:hover:not(:disabled) {
     background: #1976d2;
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .btn-primary:disabled {
@@ -327,8 +342,12 @@ details[open] summary {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Error Message */
@@ -447,7 +466,7 @@ details[open] summary {
     background: #f8f9fa;
     border-radius: 4px;
     font-size: 0.85em;
-    font-family: 'Courier New', monospace;
+    font-family: "Courier New", monospace;
     color: #dc3545;
 }
 
@@ -549,7 +568,7 @@ details[open] summary {
 #redundancyTable td {
     padding: 12px 15px;
     text-align: left;
-    border-bottom: 1px solid #dee2e6;
+    border: 1px solid #dee2e6;
 }
 
 /* Give feature name columns more space */
@@ -565,6 +584,14 @@ details[open] summary {
 #redundancyTable th {
     background: #f8f9fa;
     font-weight: 600;
+    text-align: center;
+}
+
+/* Center numeric/quality columns */
+#reliabilityTable td:nth-child(1),
+#reliabilityTable td:nth-child(3),
+#reliabilityTable td:nth-child(4) {
+    text-align: center;
 }
 
 /* Row highlighting for poor quality / problematic rows */
@@ -635,6 +662,35 @@ details[open] summary {
 #agreementSummaryTable th {
     background: #f8f9fa;
     font-weight: 600;
+}
+
+/* Agreement Detail Table */
+#agreementDetailTable table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    margin-top: 10px;
+}
+
+#agreementDetailTable th,
+#agreementDetailTable td {
+    padding: 12px 15px;
+    text-align: left;
+    border: 1px solid #dee2e6;
+}
+
+#agreementDetailTable th {
+    background: #f8f9fa;
+    font-weight: 600;
+    text-align: center;
+}
+
+#agreementDetailTable td {
+    text-align: left;
+}
+
+#agreementDetailTable td:last-child {
+    text-align: center;
 }
 
 /* Heatmap Section */
