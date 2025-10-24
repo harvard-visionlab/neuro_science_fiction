@@ -92,6 +92,14 @@ function setupEventListeners() {
     downloadLoadedDataBtn.addEventListener('click', handleDownloadLoadedData);
     step1Next.addEventListener('click', () => navigateToStep(2));
 
+    // Re-enable Load Data button when inputs change
+    yearInput.addEventListener('input', () => {
+        loadDataBtn.disabled = false;
+    });
+    groupNameInput.addEventListener('input', () => {
+        loadDataBtn.disabled = false;
+    });
+
     // Step 2
     computeReliabilityBtn.addEventListener('click', handleComputeReliability);
     downloadReliabilityChart.addEventListener('click', handleDownloadReliabilityChart);
@@ -349,6 +357,7 @@ async function handleLoadData() {
         step1Next.disabled = false;
 
         loadingIndicator.style.display = 'none';
+        loadDataBtn.disabled = false;  // Re-enable to allow loading different data
 
     } catch (error) {
         console.error('Error loading data:', error);
