@@ -22,7 +22,7 @@ let appState = {
     agreementHeatmap: null,
     redundancyResults: null,
     redundancyChart: null,
-    redundancyThresholdValue: 0.7,
+    redundancyThresholdValue: 0.5,
     similarityResults: null,
     similarityChart: null,
     similarityThresholdValue: 0.7
@@ -1462,23 +1462,22 @@ function createRedundancyHeatmap() {
         }
     }
 
-    // Create filtered matrix
+    // Create filtered matrix and convert to r² (variance explained)
     const filteredMatrix = [];
     for (let i of validFeatureIndices) {
         const row = [];
         for (let j of validFeatureIndices) {
-            row.push(featureVsFeature[i][j]);
+            const corr = featureVsFeature[i][j];
+            row.push(corr * corr);  // Convert to r²
         }
         filteredMatrix.push(row);
     }
 
-    // Custom colorscale: Blue (negative) → Black (0) → Red (positive)
+    // Sequential colorscale: Black (0) → Red (1) for r²
     const customColorscale = [
-        [0.0, 'rgb(0, 0, 255)'],      // -1.0: Blue
-        [0.25, 'rgb(100, 100, 200)'], // -0.5: Light blue
-        [0.5, 'rgb(0, 0, 0)'],        //  0.0: Black
-        [0.75, 'rgb(200, 100, 100)'], //  0.5: Light red
-        [1.0, 'rgb(255, 0, 0)']       //  1.0: Red
+        [0.0, 'rgb(0, 0, 0)'],        // 0.0: Black (no shared variance)
+        [0.5, 'rgb(200, 100, 100)'],  // 0.5: Medium red
+        [1.0, 'rgb(255, 0, 0)']       // 1.0: Bright red (perfect redundancy)
     ];
 
     // Create heatmap data in Plotly format
@@ -1488,16 +1487,16 @@ function createRedundancyHeatmap() {
         y: validFeatures,
         type: 'heatmap',
         colorscale: customColorscale,
-        zmin: -1,
+        zmin: 0,
         zmax: 1,
         hoverongaps: false,
-        hovertemplate: '%{y} vs %{x}<br>Correlation: %{z:.3f}<extra></extra>',
+        hovertemplate: '%{y} vs %{x}<br>r²: %{z:.3f}<extra></extra>',
         colorbar: {
-            title: 'Correlation',
+            title: 'r² (Variance Explained)',
             titleside: 'right',
             tickmode: 'linear',
-            tick0: -1,
-            dtick: 0.5
+            tick0: 0,
+            dtick: 0.25
         }
     }];
 
@@ -1540,7 +1539,7 @@ function createRedundancyChart() {
 
     // Filter pairs above threshold and reverse (highest first)
     const filteredPairs = pairs
-        .filter(p => p.absCorrelation >= threshold)
+        .filter(p => p.rSquared >= threshold)
         .reverse()
         .slice(0, 20); // Show top 20
 
@@ -1558,16 +1557,16 @@ function createRedundancyChart() {
         data: {
             labels: filteredPairs.map(p => p.pair),
             datasets: [{
-                label: 'Absolute Correlation',
-                data: filteredPairs.map(p => p.absCorrelation),
+                label: 'r² (Variance Explained)',
+                data: filteredPairs.map(p => p.rSquared),
                 backgroundColor: filteredPairs.map(p => {
-                    if (p.absCorrelation >= 0.9) return 'rgba(220, 53, 69, 0.8)';  // Red
-                    if (p.absCorrelation >= 0.7) return 'rgba(255, 193, 7, 0.8)';  // Yellow
+                    if (p.rSquared >= 0.81) return 'rgba(220, 53, 69, 0.8)';  // Red (was 0.9)
+                    if (p.rSquared >= 0.49) return 'rgba(255, 193, 7, 0.8)';  // Yellow (was 0.7)
                     return 'rgba(33, 150, 243, 0.8)';  // Blue
                 }),
                 borderColor: filteredPairs.map(p => {
-                    if (p.absCorrelation >= 0.9) return 'rgb(220, 53, 69)';
-                    if (p.absCorrelation >= 0.7) return 'rgb(255, 193, 7)';
+                    if (p.rSquared >= 0.81) return 'rgb(220, 53, 69)';
+                    if (p.rSquared >= 0.49) return 'rgb(255, 193, 7)';
                     return 'rgb(33, 150, 243)';
                 }),
                 borderWidth: 1
@@ -1585,7 +1584,7 @@ function createRedundancyChart() {
                     callbacks: {
                         label: function(context) {
                             const pair = filteredPairs[context.dataIndex];
-                            return `|r| = ${pair.absCorrelation.toFixed(3)} (${pair.sign})`;
+                            return `r² = ${pair.rSquared.toFixed(3)} (${pair.sign})`;
                         }
                     }
                 }
@@ -1596,7 +1595,7 @@ function createRedundancyChart() {
                     max: 1,
                     title: {
                         display: true,
-                        text: 'Absolute Correlation'
+                        text: 'r² (Variance Explained)'
                     }
                 },
                 y: {
@@ -1617,8 +1616,8 @@ function updateRedundancySummary() {
     const { pairs } = appState.redundancyResults;
     const threshold = appState.redundancyThresholdValue;
 
-    const redundantPairs = pairs.filter(p => p.absCorrelation >= threshold);
-    const veryHighPairs = pairs.filter(p => p.absCorrelation >= 0.9);
+    const redundantPairs = pairs.filter(p => p.rSquared >= threshold);
+    const veryHighPairs = pairs.filter(p => p.rSquared >= 0.81);
 
     let html = '<h3>Summary</h3>';
     html += '<div class="summary-grid">';
@@ -1627,18 +1626,18 @@ function updateRedundancySummary() {
         <div class="summary-value">${pairs.length}</div>
     </div>`;
     html += `<div class="summary-item">
-        <div class="summary-label">Above Threshold (${threshold.toFixed(2)}):</div>
+        <div class="summary-label">Above Threshold (r² ≥ ${threshold.toFixed(2)}):</div>
         <div class="summary-value">${redundantPairs.length}</div>
     </div>`;
     html += `<div class="summary-item">
-        <div class="summary-label">Very High (≥ 0.9):</div>
+        <div class="summary-label">Very High (r² ≥ 0.81):</div>
         <div class="summary-value" style="color: #dc3545;">${veryHighPairs.length}</div>
     </div>`;
     html += '</div>';
 
     if (veryHighPairs.length > 0) {
         html += '<div class="note" style="margin-top: 20px;">';
-        html += '<strong>⚠️ Warning:</strong> You have ' + veryHighPairs.length + ' feature pair(s) with very high redundancy (≥ 0.9). ';
+        html += '<strong>⚠️ Warning:</strong> You have ' + veryHighPairs.length + ' feature pair(s) with very high redundancy (r² ≥ 0.81). ';
         html += 'Consider dropping one feature from each pair to reduce multicollinearity.';
         html += '</div>';
     }
@@ -1650,13 +1649,13 @@ function createRedundancyTable() {
     const tableDiv = document.getElementById('redundancyTable');
     const { pairs } = appState.redundancyResults;
 
-    // Sort by absolute correlation descending (highest first)
+    // Sort by r² descending (highest first)
     const sortedPairs = [...pairs].sort((a, b) => {
         // Handle NaN values - put them at the end
-        if (isNaN(a.absCorrelation) && isNaN(b.absCorrelation)) return 0;
-        if (isNaN(a.absCorrelation)) return 1;
-        if (isNaN(b.absCorrelation)) return -1;
-        return b.absCorrelation - a.absCorrelation;
+        if (isNaN(a.rSquared) && isNaN(b.rSquared)) return 0;
+        if (isNaN(a.rSquared)) return 1;
+        if (isNaN(b.rSquared)) return -1;
+        return b.rSquared - a.rSquared;
     });
 
     let html = '<table><thead><tr>';
@@ -1664,31 +1663,31 @@ function createRedundancyTable() {
     html += '<th>Feature 1</th>';
     html += '<th>Feature 2</th>';
     html += '<th>Correlation</th>';
-    html += '<th>|Correlation|</th>';
+    html += '<th>r²</th>';
     html += '<th>Redundancy</th>';
     html += '</tr></thead><tbody>';
 
     sortedPairs.forEach((pair, index) => {
         let quality = '';
         let corrDisplay = '';
-        let absCorrDisplay = '';
+        let rSquaredDisplay = '';
         let rowClass = '';
 
         if (isNaN(pair.correlation)) {
             corrDisplay = 'NaN';
-            absCorrDisplay = 'NaN';
+            rSquaredDisplay = 'NaN';
             quality = '—';  // Em dash for no data
             rowClass = 'row-warning';
         } else {
             corrDisplay = pair.correlation.toFixed(3);
-            absCorrDisplay = pair.absCorrelation.toFixed(3);
+            rSquaredDisplay = pair.rSquared.toFixed(3);
 
-            if (pair.absCorrelation >= 0.9) {
+            if (pair.rSquared >= 0.81) {
                 quality = 'Very High';
                 rowClass = 'row-redundant';
-            } else if (pair.absCorrelation >= 0.7) {
+            } else if (pair.rSquared >= 0.49) {
                 quality = 'Moderate';
-            } else if (pair.absCorrelation >= 0.5) {
+            } else if (pair.rSquared >= 0.25) {
                 quality = 'Low';
             } else {
                 quality = 'Independent';
@@ -1700,7 +1699,7 @@ function createRedundancyTable() {
         html += `<td>${pair.feature1}</td>`;
         html += `<td>${pair.feature2}</td>`;
         html += `<td>${corrDisplay}</td>`;
-        html += `<td>${absCorrDisplay}</td>`;
+        html += `<td>${rSquaredDisplay}</td>`;
         html += `<td>${quality}</td>`;
         html += '</tr>';
     });
@@ -2204,15 +2203,15 @@ function displaySummaryResults() {
 
     // Step 4: Feature Redundancy
     if (appState.redundancyResults) {
-        const veryHigh = appState.redundancyResults.pairs.filter(p => !isNaN(p.absCorrelation) && p.absCorrelation >= 0.9).length;
-        const moderate = appState.redundancyResults.pairs.filter(p => !isNaN(p.absCorrelation) && p.absCorrelation >= 0.7 && p.absCorrelation < 0.9).length;
+        const veryHigh = appState.redundancyResults.pairs.filter(p => !isNaN(p.rSquared) && p.rSquared >= 0.81).length;
+        const moderate = appState.redundancyResults.pairs.filter(p => !isNaN(p.rSquared) && p.rSquared >= 0.49 && p.rSquared < 0.81).length;
 
         html += `
             <div class="summary-item">
                 <div class="summary-label">Redundant Feature Pairs</div>
                 <div class="summary-value" style="font-size: 0.9em; text-align: left;">
-                    • ${veryHigh} very high (≥0.9)<br>
-                    • ${moderate} moderate (0.7-0.9)
+                    • ${veryHigh} very high (r² ≥ 0.81)<br>
+                    • ${moderate} moderate (r² 0.49-0.81)
                 </div>
             </div>
         `;

@@ -342,8 +342,9 @@
                                 <li>Correlate these two vectors across all items (e.g., 60 items)</li>
                                 <li>Repeat for all pairs of features</li>
                             </ol>
-                            <p><strong>Example:</strong> If "living" and "animacy" both have high ratings for dogs/cats and low ratings for rocks/chairs, they'll have high positive correlation (redundant).</p>
-                            <p><strong>High correlation (> 0.9) = redundant features</strong></p>
+                            <p><strong>Example:</strong> If "living" and "animacy" both have high ratings for dogs/cats and low ratings for rocks/chairs, they'll have high r² (redundant).</p>
+                            <p><strong>High r² (> 0.81) = redundant features</strong></p>
+                            <p>r² represents the proportion of variance explained - r² = 0.81 means 81% of variance is shared between features.</p>
                             <p>Consider dropping one feature from highly redundant pairs.</p>
                         </div>
                     </details>
@@ -375,9 +376,9 @@
                         <!-- Threshold Control -->
                         <div class="threshold-control">
                             <label for="redundancyThreshold">Redundancy Threshold (show pairs above):</label>
-                            <input type="range" id="redundancyThreshold" min="0" max="1" step="0.05" value="0.7">
-                            <span id="redundancyThresholdValue">0.70</span>
-                            <p class="explanation-text">Pairs with absolute correlation above this threshold are considered redundant.</p>
+                            <input type="range" id="redundancyThreshold" min="0" max="1" step="0.05" value="0.50">
+                            <span id="redundancyThresholdValue">0.50</span>
+                            <p class="explanation-text">Pairs with r² above this threshold are considered redundant (r² = proportion of variance explained).</p>
                         </div>
 
                         <!-- Redundant Pairs Summary -->
@@ -385,11 +386,11 @@
 
                         <!-- Heatmap -->
                         <div class="heatmap-section">
-                            <h4>Feature-vs-Feature Correlation Heatmap</h4>
+                            <h4>Feature-vs-Feature r² Heatmap</h4>
                             <div class="results-header">
                                 <p class="explanation-text">
-                                    Shows correlation between each pair of features (averaged ratings across all items).
-                                    Darker red = strong positive correlation. Darker blue = strong negative correlation.
+                                    Shows r² (proportion of variance explained) between each pair of features (averaged ratings across all items).
+                                    Black = independent features (r² = 0). Darker red = more shared variance (higher r²).
                                 </p>
                                 <button id="downloadRedundancyHeatmap" class="btn-download">Download Heatmap (PNG)</button>
                             </div>
@@ -419,12 +420,13 @@
                         <div class="interpretation">
                             <h4>Interpretation Guide:</h4>
                             <ul>
-                                <li><strong>|r| &gt; 0.9:</strong> Very high redundancy - strongly consider dropping one feature</li>
-                                <li><strong>|r| = 0.7-0.9:</strong> Moderate redundancy - features are related but may provide different information</li>
-                                <li><strong>|r| = 0.5-0.7:</strong> Low redundancy - features are somewhat related</li>
-                                <li><strong>|r| &lt; 0.5:</strong> Independent features - both should be kept</li>
+                                <li><strong>r² &gt; 0.81:</strong> Very high redundancy - strongly consider dropping one feature</li>
+                                <li><strong>r² = 0.49-0.81:</strong> Moderate redundancy - features are related but may provide different information</li>
+                                <li><strong>r² = 0.25-0.49:</strong> Low redundancy - features are somewhat related</li>
+                                <li><strong>r² &lt; 0.25:</strong> Independent features - both should be kept</li>
                                 <li><strong>Positive correlation:</strong> Features move together (e.g., "living" and "animacy")</li>
                                 <li><strong>Negative correlation:</strong> Features move oppositely (e.g., "natural" and "artificial")</li>
+                                <li><strong>Note:</strong> r² always ranges 0-1, but the "Correlation" column shows the original sign (positive/negative)</li>
                             </ul>
                         </div>
                     </div>

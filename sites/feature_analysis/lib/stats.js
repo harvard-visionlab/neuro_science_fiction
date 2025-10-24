@@ -307,13 +307,14 @@ function computeFeatureRedundancy(df) {
                 pair: `${features[i]} vs ${features[j]}`,
                 correlation: corr,
                 absCorrelation: Math.abs(corr),
+                rSquared: corr * corr,  // r² = proportion of variance explained
                 sign: corr > 0 ? 'positive' : 'negative'
             });
         }
     }
 
-    // Sort by absolute correlation
-    pairs.sort((a, b) => a.absCorrelation - b.absCorrelation);
+    // Sort by rSquared (ascending - lowest first)
+    pairs.sort((a, b) => a.rSquared - b.rSquared);
 
     return pairs;
 }
