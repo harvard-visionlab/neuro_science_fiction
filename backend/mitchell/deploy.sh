@@ -167,6 +167,26 @@ function create_or_update_function() {
             --environment "Variables={FUNCTION_TYPE=${function_type}}" \
             --region ${AWS_REGION} > /dev/null
 
+        # Wait for function to be ready (important for large containers)
+        echo_info "  Waiting for function to initialize..."
+        local max_wait=120
+        local waited=0
+        while [ $waited -lt $max_wait ]; do
+            local status=$(aws lambda get-function-configuration \
+                --function-name ${function_name} \
+                --region ${AWS_REGION} \
+                --query 'LastUpdateStatus' \
+                --output text 2>/dev/null || echo "InProgress")
+
+            if [ "$status" = "Successful" ]; then
+                break
+            fi
+
+            sleep 5
+            waited=$((waited + 5))
+            echo_info "  Still waiting... (${waited}s)"
+        done
+
         # Create function URL
         aws lambda create-function-url-config \
             --function-name ${function_name} \
@@ -198,8 +218,10 @@ function deploy_functions() {
     # Format: "function-name|function-type|timeout|memory"
 
     # Start with just hello-world
+    # Format: "function-name|function-type|timeout|memory"
+    # Timeout: Higher for 3GB container cold starts (30-90 seconds)
     local functions=(
-        "mitchell-hello-world|hello-world|60|512"
+        "mitchell-hello-world|hello-world|180|1024"
     )
 
     # TODO: Add these as we implement handlers
