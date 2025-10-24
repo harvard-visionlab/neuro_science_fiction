@@ -1,0 +1,15 @@
+README.md
+.git
+.gitignore
+*.pyc
+__pycache__
+.pytest_cache
+.vscode
+.idea
+*.md
+response.json
+trust-policy.json
+s3-policy.json
+deploy.sh
+.dockerignore
+*.DS_Store
