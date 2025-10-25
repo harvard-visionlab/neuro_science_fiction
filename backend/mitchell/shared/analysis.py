@@ -188,8 +188,8 @@ def doBrainAndFeaturePrediction(brain_data, feature_data, num_voxels=500,
     This is the main analysis function that runs all 1770 leave-2-out iterations
 
     Args:
-        brain_data: dict from load_brain_data_from_s3()
-        feature_data: dict from load_feature_data_from_s3()
+        brain_data: dict from load_brain_data()
+        feature_data: dict from load_feature_data()
         num_voxels: int - Number of voxels to use
         zscore_braindata: bool - Whether to z-score brain data
         shuffle_features: bool - Shuffle features (sanity check)

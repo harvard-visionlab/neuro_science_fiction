@@ -10,13 +10,14 @@ Usage:
 
 Supported function types:
     - hello-world: Test infrastructure
-    - brain-prediction: Run brain prediction analysis
-    - mind-reading: Run mind reading analysis
-    - feature-weights: Generate brain slice visualizations
-    - individual-features: Test each feature individually
-    - mitchell-baseline: Load Mitchell's baseline results
-    - feature-prep: Prepare feature data from CSV
-    - results-aggregator: Combine multi-subject results
+    - run-analysis: Run brain prediction and mind reading analysis
+    - get-results: Retrieve analysis results from S3
+    - list-subjects: List available brain subjects
+    - list-feature-sets: List available feature datasets
+    - validate-features: Validate uploaded feature CSV
+    - upload-features: Upload feature CSV to S3
+    - feature-weights-viz: Generate brain slice visualizations
+    - aggregate-results: Aggregate results across subjects
 """
 
 import os
@@ -64,54 +65,37 @@ def handler(event, context):
         from handlers.hello_world import handler as hello_handler
         return hello_handler(event, context)
 
-    elif function_type == 'brain-prediction':
-        # TODO: Implement tomorrow
-        return {
-            'statusCode': 501,
-            'body': json.dumps({'error': 'brain-prediction handler not yet implemented'})
-        }
+    elif function_type == 'run-analysis':
+        from handlers.run_analysis import handler as run_analysis_handler
+        return run_analysis_handler(event, context)
 
-    elif function_type == 'mind-reading':
-        # TODO: Implement tomorrow
-        return {
-            'statusCode': 501,
-            'body': json.dumps({'error': 'mind-reading handler not yet implemented'})
-        }
+    elif function_type == 'get-results':
+        from handlers.get_results import handler as get_results_handler
+        return get_results_handler(event, context)
 
-    elif function_type == 'feature-weights':
-        # TODO: Implement tomorrow
-        return {
-            'statusCode': 501,
-            'body': json.dumps({'error': 'feature-weights handler not yet implemented'})
-        }
+    elif function_type == 'list-subjects':
+        from handlers.list_subjects import handler as list_subjects_handler
+        return list_subjects_handler(event, context)
 
-    elif function_type == 'individual-features':
-        # TODO: Implement tomorrow
-        return {
-            'statusCode': 501,
-            'body': json.dumps({'error': 'individual-features handler not yet implemented'})
-        }
+    elif function_type == 'list-feature-sets':
+        from handlers.list_feature_sets import handler as list_feature_sets_handler
+        return list_feature_sets_handler(event, context)
 
-    elif function_type == 'mitchell-baseline':
-        # TODO: Implement tomorrow
-        return {
-            'statusCode': 501,
-            'body': json.dumps({'error': 'mitchell-baseline handler not yet implemented'})
-        }
+    elif function_type == 'validate-features':
+        from handlers.validate_features import handler as validate_features_handler
+        return validate_features_handler(event, context)
 
-    elif function_type == 'feature-prep':
-        # TODO: Implement tomorrow
-        return {
-            'statusCode': 501,
-            'body': json.dumps({'error': 'feature-prep handler not yet implemented'})
-        }
+    elif function_type == 'upload-features':
+        from handlers.upload_features import handler as upload_features_handler
+        return upload_features_handler(event, context)
 
-    elif function_type == 'results-aggregator':
-        # TODO: Implement tomorrow
-        return {
-            'statusCode': 501,
-            'body': json.dumps({'error': 'results-aggregator handler not yet implemented'})
-        }
+    elif function_type == 'feature-weights-viz':
+        from handlers.feature_weights_viz import handler as feature_weights_viz_handler
+        return feature_weights_viz_handler(event, context)
+
+    elif function_type == 'aggregate-results':
+        from handlers.aggregate_results import handler as aggregate_results_handler
+        return aggregate_results_handler(event, context)
 
     else:
         return {
@@ -124,13 +108,14 @@ def handler(event, context):
                 'error': f'Unknown function_type: {function_type}',
                 'valid_types': [
                     'hello-world',
-                    'brain-prediction',
-                    'mind-reading',
-                    'feature-weights',
-                    'individual-features',
-                    'mitchell-baseline',
-                    'feature-prep',
-                    'results-aggregator'
+                    'run-analysis',
+                    'get-results',
+                    'list-subjects',
+                    'list-feature-sets',
+                    'validate-features',
+                    'upload-features',
+                    'feature-weights-viz',
+                    'aggregate-results'
                 ]
             })
         }

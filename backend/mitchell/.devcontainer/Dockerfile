@@ -21,7 +21,9 @@ RUN pip install --no-cache-dir \
     jupyterlab \
     ipykernel \
     black \
-    pytest
+    pytest \
+    tqdm \
+    psutil
 
 # Create a directory for notebooks
 RUN mkdir -p /workspace/notebooks

@@ -8,9 +8,6 @@ pandas==2.1.4
 Pillow==10.1.0
 matplotlib==3.8.2
 
-# AWS SDK
-boto3==1.34.44
-
 # For loading PyTorch .pth files (Mitchell baseline)
 # Using CPU-only version to save space
 torch==2.1.2 --index-url https://download.pytorch.org/whl/cpu

@@ -43,13 +43,13 @@ Create notebooks in the `notebooks/` directory to test the shared modules:
 import sys
 sys.path.insert(0, '..')
 
-from shared.brain_data import load_brain_data_from_s3, prepare_brain_data
-from shared.feature_data import load_feature_data_from_s3, prepare_ratings
+from shared.brain_data import load_brain_data, prepare_brain_data
+from shared.feature_data import load_feature_data, prepare_ratings
 from shared.analysis import doBrainAndFeaturePrediction
 
 # Load data
-brain_data = load_brain_data_from_s3(brain_subject=1)
-feature_data = load_feature_data_from_s3(year='2025', group_name='Testing')
+brain_data = load_brain_data(1)  # Subject 1
+feature_data = load_feature_data(year='2025', group_name='Testing')
 
 # Run analysis (just a few iterations for testing)
 results = doBrainAndFeaturePrediction(

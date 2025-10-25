@@ -3,20 +3,19 @@ Hello World Handler - Tests infrastructure
 
 Tests:
 - Python scientific stack (numpy, scipy, sklearn)
-- S3 access to neuroscience-fiction bucket
+- Public S3 URL access
 - Basic computation
 """
 
 import json
+import urllib.request
 import numpy as np
 import scipy
 import sklearn
-import boto3
 from datetime import datetime
 
-# Initialize S3 client
-s3_client = boto3.client('s3', region_name='us-east-1')
-BUCKET_NAME = 'neuroscience-fiction'
+# Test URL for public S3 access
+TEST_URL = 'https://neuroscience-fiction.s3.us-east-1.amazonaws.com/brain-data/mitchell2008/data-science-P1_converted.mat'
 
 
 def handler(event, context):
@@ -45,18 +44,16 @@ def handler(event, context):
         from sklearn.linear_model import LinearRegression
         model = LinearRegression()
 
-        # Test S3 access - list survey folder
+        # Test public S3 URL access - HEAD request to check file exists
         try:
-            response = s3_client.list_objects_v2(
-                Bucket=BUCKET_NAME,
-                Prefix='survey/',
-                MaxKeys=5
-            )
+            req = urllib.request.Request(TEST_URL, method='HEAD')
+            response = urllib.request.urlopen(req, timeout=5)
             s3_test = {
                 'success': True,
-                'bucket': BUCKET_NAME,
-                'objects_found': response.get('KeyCount', 0),
-                'sample_keys': [obj['Key'] for obj in response.get('Contents', [])[:3]]
+                'url': TEST_URL,
+                'status_code': response.status,
+                'content_length': response.headers.get('Content-Length', 'unknown'),
+                'content_type': response.headers.get('Content-Type', 'unknown')
             }
         except Exception as e:
             s3_test = {

@@ -1,45 +1,79 @@
 """
 Brain data loading and preparation functions
 
-Handles loading fMRI data from S3 and preparing it for analysis
+Handles loading fMRI data from local files, URLs, or subject IDs
 """
 
 import os
+import urllib.request
 import numpy as np
-import boto3
 import scipy.io as sio
 from scipy.stats import zscore
 
 
-s3_client = boto3.client('s3', region_name='us-east-1')
-BUCKET_NAME = 'neuroscience-fiction'
+# Public S3 base URL for brain data
+S3_BASE_URL = 'https://neuroscience-fiction.s3.us-east-1.amazonaws.com/brain-data/mitchell2008/'
 
 
-def load_brain_data_from_s3(brain_subject, cache_dir='/tmp'):
+def _download_file(url, dest_path):
     """
-    Load brain data for a specific subject from S3
+    Download file from public URL
 
     Args:
-        brain_subject: int (1-9) - Which subject's data to load
-        cache_dir: str - Directory to cache downloaded files
+        url: str - Public URL to download from
+        dest_path: str - Local path to save file
+    """
+    os.makedirs(os.path.dirname(dest_path) or '.', exist_ok=True)
+    print(f'Downloading from {url}')
+    urllib.request.urlretrieve(url, dest_path)
+    print(f'Cached to {dest_path}')
+
+
+def load_brain_data(source, cache_dir='/tmp'):
+    """
+    Load brain data from subject ID, local file path, or public URL
+
+    Args:
+        source: int (1-9), str (local file path), or str (public URL)
+                - int: Subject number (1-9), downloads from public S3
+                - str starting with http(s): Public URL, downloads and caches
+                - str (other): Local file path, loads directly
+        cache_dir: str - Directory to cache downloaded files (default: /tmp)
 
     Returns:
         dict with brain data (D, meta, sortIdx, voxelReliability, etc.)
+
+    Examples:
+        load_brain_data(1)  # Subject 1 from public S3
+        load_brain_data('./data/data-science-P1_converted.mat')  # Local file
+        load_brain_data('https://neuroscience-fiction.s3.us-east-1.amazonaws.com/...')  # URL
     """
-    # Create cache directory if needed
-    os.makedirs(cache_dir, exist_ok=True)
-
-    # Local cache file
-    cache_file = os.path.join(cache_dir, f'data-science-P{brain_subject}_converted.mat')
-
-    # Download from S3 if not cached
-    if not os.path.exists(cache_file):
-        s3_key = f'brain-data/data-science-P{brain_subject}_converted.mat'
-        print(f'Downloading brain data from s3://{BUCKET_NAME}/{s3_key}')
-        s3_client.download_file(BUCKET_NAME, s3_key, cache_file)
-        print(f'Cached to {cache_file}')
+    # Determine source type and file path
+    if isinstance(source, int):
+        # Subject ID: convert to public URL
+        brain_subject = source
+        url = f'{S3_BASE_URL}data-science-P{brain_subject}_converted.mat'
+        cache_file = os.path.join(cache_dir, f'data-science-P{brain_subject}_converted.mat')
+    elif isinstance(source, str) and (source.startswith('http://') or source.startswith('https://')):
+        # Public URL: download and cache
+        brain_subject = None
+        url = source
+        cache_file = os.path.join(cache_dir, os.path.basename(source))
     else:
-        print(f'Using cached brain data: {cache_file}')
+        # Local file path: use directly
+        brain_subject = None
+        url = None
+        cache_file = source
+
+    # Download if needed
+    if url:
+        os.makedirs(cache_dir, exist_ok=True)
+        if not os.path.exists(cache_file):
+            _download_file(url, cache_file)
+        else:
+            print(f'Using cached brain data: {cache_file}')
+    else:
+        print(f'Loading brain data from: {cache_file}')
 
     # Load .mat file
     brain_data = sio.loadmat(
@@ -49,8 +83,9 @@ def load_brain_data_from_s3(brain_subject, cache_dir='/tmp'):
         simplify_cells=True
     )
 
-    # Add subject number to data
-    brain_data['brain_sub'] = brain_subject
+    # Add subject number if available
+    if brain_subject is not None:
+        brain_data['brain_sub'] = brain_subject
 
     return brain_data
 
