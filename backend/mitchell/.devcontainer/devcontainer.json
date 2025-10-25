@@ -1,0 +1,40 @@
+{
+  "name": "Mitchell Brain Prediction",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+
+  // Forward JupyterLab port
+  "forwardPorts": [8888],
+
+  // VS Code extensions
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.formatting.provider": "black"
+      }
+    }
+  },
+
+  // Run JupyterLab on container start
+  "postStartCommand": "jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''",
+
+  // Mount AWS credentials from host
+  "mounts": [
+    "source=${localEnv:HOME}/.aws,target=/root/.aws,type=bind,consistency=cached"
+  ],
+
+  // Environment variables
+  "remoteEnv": {
+    "AWS_REGION": "us-east-1"
+  }
+}

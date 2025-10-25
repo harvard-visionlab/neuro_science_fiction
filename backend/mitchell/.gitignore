@@ -1,0 +1,6 @@
+# Ignore everything in notebooks/
+notebooks/*
+
+# But keep these specific files
+!notebooks/.gitkeep
+!notebooks/testing1.ipynb
