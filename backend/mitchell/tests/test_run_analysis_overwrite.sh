@@ -19,7 +19,7 @@ YEAR=2022
 GROUP_NAME="dopaminemachine"
 NUM_VOXELS=500
 ZSCORE_BRAINDATA=false
-TEST_INDIVIDUAL_FEATURES=false
+TEST_INDIVIDUAL_FEATURES=true
 
 echo ""
 echo_info "Test parameters:"
