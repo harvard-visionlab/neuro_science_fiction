@@ -15,10 +15,10 @@ echo_info "URL: ${FUNCTION_URL}"
 
 # Test parameters
 BRAIN_SUBJECT=1
-YEAR=2001
-GROUP_NAME="workshop-2025-01"
+YEAR=2022
+GROUP_NAME="dopaminemachine"
 NUM_VOXELS=500
-ZSCORE_BRAINDATA=true
+ZSCORE_BRAINDATA=false
 TEST_INDIVIDUAL_FEATURES=false
 
 echo ""
