@@ -177,15 +177,11 @@ def handler(event, context):
                             'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
                         },
                         'body': json.dumps({
+                            'message': 'Results already exist (cached). Use overwrite=true to recompute.',
                             'cached': True,
-                            'message': 'Results already exist. Use overwrite=true to recompute.',
-                            'brain_subject': brain_subject,
-                            'year': year,
-                            'group_name': group_name,
-                            'num_voxels': num_voxels,
-                            'zscore_braindata': zscore_braindata,
-                            's3_urls': s3_urls,
-                            'config': config_data
+                            'config': config_data,
+                            'summary': config_data.get('summary', {}),
+                            's3_urls': s3_urls
                         })
                     }
             except s3_client.exceptions.NoSuchKey:
@@ -281,7 +277,12 @@ def handler(event, context):
         # Get actual number of iterations from results
         num_iterations = len(results['all_betas'])
 
-        # Save config for reproducibility
+        # Compute summary statistics
+        print(f"\nComputing summary statistics...")
+        summary = compute_summary_statistics(
+            results_df, elapsed_time, num_iterations)
+
+        # Save config for reproducibility (includes summary)
         config = {
             'brain_subject': brain_subject,
             'year': year,
@@ -294,7 +295,8 @@ def handler(event, context):
             'num_iterations': num_iterations,
             'num_features': len(feature_data['featureNames']),
             'feature_names': feature_data['featureNames'].tolist(),
-            's3_path': f's3://{S3_BUCKET}/{base_key}/'
+            's3_path': f's3://{S3_BUCKET}/{base_key}/',
+            'summary': summary
         }
         config_path = '/tmp/analysis/config.json'
         with open(config_path, 'w') as f:
@@ -341,11 +343,6 @@ def handler(event, context):
             file_sizes[s3_filename.replace(
                 '.', '_') + '_size_mb'] = round(file_size_mb, 2)
 
-        # Compute summary statistics
-        print(f"\nComputing summary statistics...")
-        summary = compute_summary_statistics(
-            results_df, elapsed_time, num_iterations)
-
         # Clean up /tmp files
         print(f"Cleaning up temporary files...")
         for _, local_path, _ in files_to_upload:
@@ -366,22 +363,24 @@ def handler(event, context):
                 'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
             },
             'body': json.dumps({
+                'message': 'Analysis complete',
                 'cached': False,
-                'brain_subject': brain_subject,
-                'year': year,
-                'group_name': group_name,
-                'num_voxels': num_voxels,
-                'zscore_braindata': zscore_braindata,
-                'summary': summary,
-                's3_urls': s3_urls,
-                's3_path': f's3://{S3_BUCKET}/{base_key}/',
-                'files': file_sizes,
                 'config': {
+                    'brain_subject': brain_subject,
+                    'year': year,
+                    'group_name': group_name,
                     'num_voxels': num_voxels,
                     'zscore_braindata': zscore_braindata,
                     'testIndividualFeatures': testIndividualFeatures,
-                    'num_features': len(feature_data['featureNames'])
-                }
+                    'num_features': len(feature_data['featureNames']),
+                    'num_iterations': num_iterations,
+                    'timestamp': start_time.isoformat(),
+                    'elapsed_time': elapsed_time,
+                    's3_path': f's3://{S3_BUCKET}/{base_key}/'
+                },
+                'summary': summary,
+                's3_urls': s3_urls,
+                'files': file_sizes
             })
         }
 
