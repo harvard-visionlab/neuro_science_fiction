@@ -4,3 +4,7 @@ notebooks/*
 # But keep these specific files
 !notebooks/.gitkeep
 !notebooks/testing1.ipynb
+!notebooks/test_run_analysis.ipynb
+
+# Ignore test results data
+notebooks/data/test-results/
