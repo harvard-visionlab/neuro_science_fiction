@@ -302,7 +302,8 @@ def handler(event, context):
 
         # Upload to S3
         print(f"\nUploading results to S3...")
-        base_key = f'analysis-results/{year}/{group_name}/{analysis_id}/brain-subject-{brain_subject}'
+        zscore_str = 'True' if zscore_braindata else 'False'
+        base_key = f'analysis-results/{year}/{group_name}/mind-reading/n{num_voxels}_z{zscore_str}/brain-subject-{brain_subject}'
 
         files_to_upload = [
             ('results.csv', results_csv_path, 'text/csv'),
