@@ -72,7 +72,8 @@ def handler(event, context):
         num_voxels = body.get('num_voxels', 500)
         zscore_braindata = body.get('zscore_braindata', False)
         testIndividualFeatures = body.get('testIndividualFeatures', False)
-        overwrite = body.get('overwrite', False)  # Default: don't overwrite existing results
+        # Default: don't overwrite existing results
+        overwrite = body.get('overwrite', False)
 
         # Validation
         if brain_subject is None or year is None or group_name is None:
@@ -114,24 +115,29 @@ def handler(event, context):
         config_key = f'{base_key}/config.json'
 
         if not overwrite:
-            print(f"Checking if results already exist at s3://{S3_BUCKET}/{config_key}")
+            print(
+                f"Checking if results already exist at s3://{S3_BUCKET}/{config_key}")
             try:
                 s3_client.head_object(Bucket=S3_BUCKET, Key=config_key)
                 # Config exists - results already computed
                 print(f"✓ Results already exist! Returning cached results.")
 
                 # Download config to validate it matches requested parameters
-                config_obj = s3_client.get_object(Bucket=S3_BUCKET, Key=config_key)
+                config_obj = s3_client.get_object(
+                    Bucket=S3_BUCKET, Key=config_key)
                 config_data = json.loads(config_obj['Body'].read())
 
                 # Validate config matches requested parameters
                 config_mismatch = []
                 if config_data.get('num_voxels') != num_voxels:
-                    config_mismatch.append(f"num_voxels: cached={config_data.get('num_voxels')}, requested={num_voxels}")
+                    config_mismatch.append(
+                        f"num_voxels: cached={config_data.get('num_voxels')}, requested={num_voxels}")
                 if config_data.get('zscore_braindata') != zscore_braindata:
-                    config_mismatch.append(f"zscore_braindata: cached={config_data.get('zscore_braindata')}, requested={zscore_braindata}")
+                    config_mismatch.append(
+                        f"zscore_braindata: cached={config_data.get('zscore_braindata')}, requested={zscore_braindata}")
                 if config_data.get('testIndividualFeatures') != testIndividualFeatures:
-                    config_mismatch.append(f"testIndividualFeatures: cached={config_data.get('testIndividualFeatures')}, requested={testIndividualFeatures}")
+                    config_mismatch.append(
+                        f"testIndividualFeatures: cached={config_data.get('testIndividualFeatures')}, requested={testIndividualFeatures}")
 
                 if config_mismatch:
                     # Config doesn't match - need to recompute
@@ -155,10 +161,12 @@ def handler(event, context):
                     if config_data.get('testIndividualFeatures'):
                         # Verify it actually exists
                         try:
-                            s3_client.head_object(Bucket=S3_BUCKET, Key=f'{base_key}/results_by_feature.csv')
+                            s3_client.head_object(
+                                Bucket=S3_BUCKET, Key=f'{base_key}/results_by_feature.csv')
                             s3_urls['results_by_feature_csv'] = f'https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{base_key}/results_by_feature.csv'
                         except:
-                            print(f"Warning: testIndividualFeatures=true but results_by_feature.csv not found")
+                            print(
+                                f"Warning: testIndividualFeatures=true but results_by_feature.csv not found")
 
                     return {
                         'statusCode': 200,
@@ -189,7 +197,8 @@ def handler(event, context):
                 print(f"Proceeding with analysis...")
 
         else:
-            print(f"Overwrite mode enabled. Running analysis regardless of existing results.")
+            print(
+                f"Overwrite mode enabled. Running analysis regardless of existing results.")
 
         print(f"\n" + "=" * 60)
         print(f"STARTING ANALYSIS")
@@ -333,7 +342,8 @@ def handler(event, context):
 
         # Compute summary statistics
         print(f"\nComputing summary statistics...")
-        summary = compute_summary_statistics(results_df, elapsed_time, num_iterations)
+        summary = compute_summary_statistics(
+            results_df, elapsed_time, num_iterations)
 
         # Clean up /tmp files
         print(f"Cleaning up temporary files...")

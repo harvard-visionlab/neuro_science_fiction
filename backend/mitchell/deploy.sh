@@ -141,12 +141,45 @@ function create_or_update_function() {
     echo_info "Deploying ${function_name}..."
 
     if aws lambda get-function --function-name ${function_name} --region ${AWS_REGION} &> /dev/null; then
-        # Update existing
+        # Update existing - code first
         aws lambda update-function-code \
             --function-name ${function_name} \
             --image-uri ${IMAGE_URI} \
             --region ${AWS_REGION} > /dev/null
 
+        # Wait for code update to complete before updating configuration
+        echo_info "  Waiting for code update to complete..."
+        local max_wait=120
+        local waited=0
+        while [ $waited -lt $max_wait ]; do
+            local status=$(aws lambda get-function-configuration \
+                --function-name ${function_name} \
+                --region ${AWS_REGION} \
+                --query 'LastUpdateStatus' \
+                --output text 2>/dev/null || echo "InProgress")
+
+            if [ "$status" = "Successful" ]; then
+                break
+            fi
+
+            if [ "$status" = "Failed" ]; then
+                echo_error "  Code update failed!"
+                return 1
+            fi
+
+            sleep 5
+            waited=$((waited + 5))
+            if [ $((waited % 15)) -eq 0 ]; then
+                echo_info "  Still waiting... (${waited}s, status: ${status})"
+            fi
+        done
+
+        if [ $waited -ge $max_wait ]; then
+            echo_error "  Timeout waiting for code update"
+            return 1
+        fi
+
+        # Now update configuration
         aws lambda update-function-configuration \
             --function-name ${function_name} \
             --timeout ${timeout} \
@@ -216,22 +249,15 @@ function deploy_functions() {
 
     # Function definitions: name, function_type, timeout, memory
     # Format: "function-name|function-type|timeout|memory"
-
-    # Start with just hello-world
-    # Format: "function-name|function-type|timeout|memory"
-    # Timeout: Higher for 3GB container cold starts (30-90 seconds)
     local functions=(
         "mitchell-hello-world|hello-world|180|1024"
+        "mitchell-run-analysis|run-analysis|900|5120"
     )
 
     # TODO: Add these as we implement handlers
-    # "mitchell-brain-prediction|brain-prediction|900|3008"
-    # "mitchell-mind-reading|mind-reading|900|3008"
-    # "mitchell-feature-weights|feature-weights|120|1024"
-    # "mitchell-individual-features|individual-features|900|3008"
-    # "mitchell-baseline|mitchell-baseline|30|256"
-    # "mitchell-feature-prep|feature-prep|60|512"
-    # "mitchell-results-aggregator|results-aggregator|60|512"
+    # "mitchell-get-results|get-results|30|512"
+    # "mitchell-aggregate-results|aggregate-results|60|512"
+    # "mitchell-feature-weights-viz|feature-weights-viz|120|1024"
 
     for func_config in "${functions[@]}"; do
         IFS='|' read -r func_name func_type timeout memory <<< "$func_config"
@@ -246,6 +272,7 @@ function show_urls() {
 
     local functions=(
         "mitchell-hello-world"
+        "mitchell-run-analysis"
     )
 
     for func_name in "${functions[@]}"; do
