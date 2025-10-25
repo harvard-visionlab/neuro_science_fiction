@@ -4,7 +4,7 @@
 
 This document outlines the plan for converting the Python/Jupyter notebook (`2022/mitchell_feature_modeling_class.ipynb`) into an interactive web application. The app will enable students to perform "brain prediction" and "mind reading" analyses using their feature ratings and fMRI brain data.
 
-**Status**: =Ë **PLANNING PHASE** - Architecture and implementation strategy
+**Status**: =ï¿½ **PLANNING PHASE** - Architecture and implementation strategy
 
 ### Goals
 
@@ -45,37 +45,47 @@ A multi-step interactive web application that successfully replaces the Jupyter 
 
 ### Backend Architecture (AWS Serverless)
 
-#### Lambda Function Strategy
+**Note**: For detailed backend architecture, Lambda configuration, deployment procedures, and SQS integration plans, see [`backend/mitchell/CLAUDE.md`](../../backend/mitchell/CLAUDE.md).
 
-Given the computational intensity (Python ML libraries, large datasets, long processing times), we'll use **AWS Lambda with Docker containers** rather than traditional Lambda layers:
+#### Overview
 
-**Why Containerized Lambda?**
-- Package size: NumPy + SciPy + scikit-learn + PyTorch exceeds Lambda layer limits (50MB zipped)
-- Brain data files are large (potentially 100MB+ per subject)
-- Processing time: 1770 iterations × 9 subjects could approach Lambda's 15-minute timeout
-- Flexibility: Full control over Python environment and dependencies
-- Deployment: Single Docker image, no layer management
+The backend uses **AWS Lambda with Docker containers** to handle computational analysis:
+- Containerized Python ML stack (NumPy, SciPy, scikit-learn, PyTorch)
+- Analysis takes ~2-7 minutes depending on configuration
+- Results cached in S3 for instant retrieval
 
-**Container Base Image:**
-```dockerfile
-FROM public.ecr.aws/lambda/python:3.11
-```
+#### Two Analysis Paths
 
-#### Lambda Functions Design
+1. **Automatic Trigger** (for students completing feature ratings)
+   - CSV uploaded â†’ S3 event â†’ Automatic full analysis
+   - Processes all 9 brain subjects with standard config
+   - Takes ~45-60 minutes total (subjects processed in batches of 3)
 
-**1. Feature Data Preparation (`feature-data-prep`)**
-- **Input**: year, groupName, featureNames (optional filter)
-- **Process**:
-  - Fetch feature ratings from S3 (via csv-generator)
-  - Convert to numpy array format required by analysis
-  - Validate 60 items × N features × M raters structure
-  - Reorder items to match brain data order
-- **Output**: JSON with feature matrix (60 items × N features)
-- **Storage**: Save to S3 at `brain-prediction/{year}/{groupName}/feature-data.json`
-- **Timeout**: 1 minute
-- **Memory**: 512 MB
+2. **Direct Invocation** (for custom experiments)
+   - Frontend calls Lambda with custom parameters
+   - Single subject or specific configuration
+   - Used for testing and advanced analyses
 
-**2. Brain Prediction Compute (`brain-prediction-compute`)**
+#### Backend Endpoints
+
+**mitchell-run-analysis**: Core brain prediction and mind reading analysis
+- Runs leave-2-out cross-validation (1770 iterations)
+- Takes ~2-7 minutes depending on configuration
+- Returns accuracy scores and feature weights
+
+**mitchell-hello-world**: Health check
+- Tests dependencies and S3 connectivity
+
+For complete API documentation, see `backend/mitchell/CLAUDE.md`.
+
+---
+
+**Note**: The detailed Lambda function specifications below are deprecated and kept for reference. See `backend/mitchell/CLAUDE.md` for current backend architecture.
+
+<details>
+<summary>Deprecated: Detailed Lambda Specifications (click to expand)</summary>
+
+### Frontend-Backend Integration (DEPRECATED)
 - **Input**:
   - featureDataS3Key (from step 1)
   - brainSubject (1-9)
@@ -87,7 +97,7 @@ FROM public.ecr.aws/lambda/python:3.11
   - Load feature data from S3
   - Run leave-2-out cross-validation (1770 iterations)
   - For each iteration:
-    - Train linear regression (features ’ voxels)
+    - Train linear regression (features ï¿½ voxels)
     - Predict brain response for 2 held-out items
     - Score prediction (correlation distance)
   - Compute accuracy (overall, same-category, different-category)
@@ -95,7 +105,7 @@ FROM public.ecr.aws/lambda/python:3.11
 - **Output**:
   - JSON with 1770 rows (one per item pair)
   - Summary statistics (accuracy overall, by category)
-  - Feature weights matrix (N features × M voxels)
+  - Feature weights matrix (N features ï¿½ M voxels)
 - **Storage**: Save to S3 at `brain-prediction/{year}/{groupName}/{analysisId}/subject-{N}-results.json`
 - **Timeout**: 15 minutes
 - **Memory**: 3008 MB (maximum)
@@ -107,7 +117,7 @@ FROM public.ecr.aws/lambda/python:3.11
   - Load brain data and feature data
   - Run leave-2-out cross-validation
   - For each iteration:
-    - Train linear regression (features ’ voxels)
+    - Train linear regression (features ï¿½ voxels)
     - Invert to predict features from brain responses
     - Score prediction (correlation between predicted and actual features)
   - Compute accuracy (overall, same-category, different-category)
@@ -124,7 +134,7 @@ FROM public.ecr.aws/lambda/python:3.11
   - scaling ('relative' or 'absolute')
 - **Process**:
   - Load feature weights from brain-prediction results
-  - Map weights to 3D brain coordinates (51×61×23 voxel cube)
+  - Map weights to 3D brain coordinates (51ï¿½61ï¿½23 voxel cube)
   - Average across subjects if multiple selected
   - Convert to color-coded slices (yellow/red for positive, blue for negative)
   - Generate 23 PNG images (one per brain slice)
@@ -236,39 +246,39 @@ neuro-science-fiction-results/
 
 ```
 User Input (year, groupName)
-    “
-Load Feature Ratings (PapaParse ’ CSV from csv-generator Lambda)
-    “
+    ï¿½
+Load Feature Ratings (PapaParse ï¿½ CSV from csv-generator Lambda)
+    ï¿½
 [User clicks "Run Brain Prediction"]
-    “
-Frontend calls feature-data-prep Lambda ’ S3
-    “
-Frontend calls brain-prediction-compute Lambda × 9 subjects (parallel)
-    “
+    ï¿½
+Frontend calls feature-data-prep Lambda ï¿½ S3
+    ï¿½
+Frontend calls brain-prediction-compute Lambda ï¿½ 9 subjects (parallel)
+    ï¿½
 Each Lambda processes 1770 pairs, saves to S3
-    “
+    ï¿½
 Frontend polls S3 for results (or uses EventBridge/SQS for notifications)
-    “
+    ï¿½
 Frontend calls results-aggregator Lambda
-    “
+    ï¿½
 Display results: Charts, tables, comparisons
-    “
+    ï¿½
 [User explores visualizations]
-    “
+    ï¿½
 Frontend calls feature-weights-viz Lambda for brain slices
-    “
+    ï¿½
 Display interactive brain slice viewer
 ```
 
 ### Handling Long-Running Computations
 
-**Challenge**: 9 subjects × 1770 pairs × complex ML = potentially > 15 minutes
+**Challenge**: 9 subjects ï¿½ 1770 pairs ï¿½ complex ML = potentially > 15 minutes
 
 **Solutions**:
 
 1. **Parallel Invocation**:
    - Run each brain subject in a separate Lambda (9 parallel invocations)
-   - Each Lambda processes one subject (1770 pairs) ’ ~90 seconds estimated
+   - Each Lambda processes one subject (1770 pairs) ï¿½ ~90 seconds estimated
    - Frontend makes 9 async calls, tracks progress
 
 2. **Progress Tracking**:
@@ -298,6 +308,10 @@ If processing time exceeds Lambda limits even with parallelization:
 - Results still saved to S3
 
 **Recommendation**: Start with containerized Lambda, migrate to Batch only if needed.
+
+</details>
+
+---
 
 ## Frontend Implementation Plan
 
@@ -377,7 +391,7 @@ const analysisId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 1. Show loading indicator with progress tracking
 2. Call `feature-data-prep` Lambda
 3. Wait for S3 upload confirmation
-4. Call `brain-prediction-compute` Lambda × N subjects (parallel)
+4. Call `brain-prediction-compute` Lambda ï¿½ N subjects (parallel)
 5. Poll S3 for progress updates every 2 seconds
 6. When complete, call `results-aggregator` Lambda
 7. Display results
@@ -425,7 +439,7 @@ This is the inverse problem: given brain activity, can we determine what
 the person was looking at?
 
 - Uses the same feature-to-voxel mapping
-- But now we work backwards: brain ’ features ’ item
+- But now we work backwards: brain ï¿½ features ï¿½ item
 - This is "true" mind reading (not tested in Mitchell's original paper)
 ```
 
@@ -461,7 +475,7 @@ class BrainSliceViewer {
   }
 
   render() {
-    // Create 5×5 grid (23 slices + 2 empty)
+    // Create 5ï¿½5 grid (23 slices + 2 empty)
     // Each slice is an <img> with hover tooltip
     // Click to enlarge
   }
@@ -474,7 +488,7 @@ class BrainSliceViewer {
   - Yellow/Red: Positive weights (voxel increases activity for this feature)
   - Blue: Negative weights (voxel decreases activity)
   - Gray: Minimal weight
-- Labels: "Bottom of brain" ’ "Top of brain"
+- Labels: "Bottom of brain" ï¿½ "Top of brain"
 - Interactive: Hover for voxel weight, click to zoom
 
 **Interpretation:**
@@ -528,7 +542,7 @@ Each feature was tested individually (not combined with other features).
 #### Step 7: Category Analysis
 
 **Display:**
-- 2×2 grid of bar charts:
+- 2ï¿½2 grid of bar charts:
   - Brain Prediction (Same Category)
   - Brain Prediction (Different Category)
   - Mind Reading (Same Category)
@@ -600,7 +614,7 @@ Compare your pattern to Mitchell's:
 
 ## Implementation Phases
 
-### Phase 1: Backend Infrastructure ó TO DO
+### Phase 1: Backend Infrastructure ï¿½ TO DO
 
 **Priority: High** - This is the foundation
 
@@ -642,7 +656,7 @@ Compare your pattern to Mitchell's:
 
 **Estimated Time**: 2-3 weeks
 
-### Phase 2: Frontend Foundation ó TO DO
+### Phase 2: Frontend Foundation ï¿½ TO DO
 
 **Priority: High** - User interface basics
 
@@ -668,7 +682,7 @@ Compare your pattern to Mitchell's:
 
 **Estimated Time**: 1 week
 
-### Phase 3: Core Analysis Integration ó TO DO
+### Phase 3: Core Analysis Integration ï¿½ TO DO
 
 **Priority: High** - Connect frontend to backend
 
@@ -692,7 +706,7 @@ Compare your pattern to Mitchell's:
 
 **Estimated Time**: 2 weeks
 
-### Phase 4: Visualizations ó TO DO
+### Phase 4: Visualizations ï¿½ TO DO
 
 **Priority: Medium** - Enhanced analysis features
 
@@ -709,12 +723,12 @@ Compare your pattern to Mitchell's:
    - Comparison to feature reliability
 
 3. **Implement Step 7: Category Analysis**
-   - 2×2 chart grid
+   - 2ï¿½2 chart grid
    - Statistical comparisons
 
 **Estimated Time**: 1.5 weeks
 
-### Phase 5: Summary & Export ó TO DO
+### Phase 5: Summary & Export ï¿½ TO DO
 
 **Priority: Medium** - Polishing and reporting
 
@@ -732,7 +746,7 @@ Compare your pattern to Mitchell's:
 
 **Estimated Time**: 1 week
 
-### Phase 6: Testing & Optimization ó TO DO
+### Phase 6: Testing & Optimization ï¿½ TO DO
 
 **Priority: Medium** - Quality assurance
 
@@ -755,7 +769,7 @@ Compare your pattern to Mitchell's:
 
 **Estimated Time**: 1 week
 
-### Phase 7: Documentation & Deployment ó TO DO
+### Phase 7: Documentation & Deployment ï¿½ TO DO
 
 **Priority: Low** - Finalization
 
@@ -794,7 +808,7 @@ Compare your pattern to Mitchell's:
 
 ### Challenge 2: Processing Time
 
-**Problem**: 1770 iterations × 9 subjects could exceed 15-minute Lambda limit
+**Problem**: 1770 iterations ï¿½ 9 subjects could exceed 15-minute Lambda limit
 
 **Solution**: Parallelization
 - Run each subject in separate Lambda invocation
@@ -850,9 +864,9 @@ Compare your pattern to Mitchell's:
 6. **Batching**: Offer "Run All 9 Subjects" vs "Run Subject 1 First" (let user test with 1 before committing to 9)
 
 **Estimated costs (per analysis run):**
-- Lambda compute (9 subjects × 90 seconds × $0.0000166667/GB-second for 3GB): ~$0.04
-- Lambda requests (9 invocations × $0.20/1M): negligible
-- S3 storage (500MB results × $0.023/GB/month): ~$0.01/month
+- Lambda compute (9 subjects ï¿½ 90 seconds ï¿½ $0.0000166667/GB-second for 3GB): ~$0.04
+- Lambda requests (9 invocations ï¿½ $0.20/1M): negligible
+- S3 storage (500MB results ï¿½ $0.023/GB/month): ~$0.01/month
 - S3 requests (PUT/GET): negligible
 - **Total per analysis**: ~$0.05
 

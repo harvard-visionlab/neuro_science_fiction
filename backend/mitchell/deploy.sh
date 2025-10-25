@@ -251,7 +251,7 @@ function deploy_functions() {
     # Format: "function-name|function-type|timeout|memory"
     local functions=(
         "mitchell-hello-world|hello-world|180|1024"
-        "mitchell-run-analysis|run-analysis|900|7680"
+        "mitchell-run-analysis|run-analysis|900|5120"
     )
 
     # TODO: Add these as we implement handlers
