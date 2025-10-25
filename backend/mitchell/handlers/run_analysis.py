@@ -152,9 +152,9 @@ def handler(event, context):
 
                     # Construct S3 URLs for cached results
                     s3_urls = {
-                        'results_csv': f'https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{base_key}/results.csv',
-                        'all_betas_pth': f'https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{base_key}/all_betas.pth',
-                        'config_json': f'https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{base_key}/config.json'
+                        'results_csv': f'https://s3.us-east-1.amazonaws.com/{S3_BUCKET}/{base_key}/results.csv',
+                        'all_betas_pth': f'https://s3.us-east-1.amazonaws.com/{S3_BUCKET}/{base_key}/all_betas.pth',
+                        'config_json': f'https://s3.us-east-1.amazonaws.com/{S3_BUCKET}/{base_key}/config.json'
                     }
 
                     # Only include results_by_feature if it was requested (and should exist)
@@ -163,7 +163,8 @@ def handler(event, context):
                         try:
                             s3_client.head_object(
                                 Bucket=S3_BUCKET, Key=f'{base_key}/results_by_feature.csv')
-                            s3_urls['results_by_feature_csv'] = f'https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{base_key}/results_by_feature.csv'
+                            s3_urls[
+                                'results_by_feature_csv'] = f'https://s3.us-east-1.amazonaws.com/{S3_BUCKET}/{base_key}/results_by_feature.csv'
                         except:
                             print(
                                 f"Warning: testIndividualFeatures=true but results_by_feature.csv not found")
@@ -334,7 +335,7 @@ def handler(event, context):
                 }
             )
 
-            s3_url = f'https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{s3_key}'
+            s3_url = f'https://s3.us-east-1.amazonaws.com/{S3_BUCKET}/{s3_key}'
             s3_urls[s3_filename.replace('.', '_')] = s3_url
 
             # Get file size

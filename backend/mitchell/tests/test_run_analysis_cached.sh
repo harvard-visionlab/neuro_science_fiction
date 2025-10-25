@@ -109,13 +109,22 @@ if [ "$ELAPSED2" -gt 5 ]; then
 fi
 
 # Compare results to ensure consistency
-ACCURACY1=$(echo "$RESPONSE1" | jq -r '.summary.total_accuracy')
-ACCURACY2=$(echo "$RESPONSE2" | jq -r '.summary.total_accuracy')
+BRAIN_PRED1=$(echo "$RESPONSE1" | jq -r '.summary.brain_prediction_encoding_model_combo')
+BRAIN_PRED2=$(echo "$RESPONSE2" | jq -r '.summary.brain_prediction_encoding_model_combo')
+MIND_READ1=$(echo "$RESPONSE1" | jq -r '.summary.mind_reading_encoding_model_combo')
+MIND_READ2=$(echo "$RESPONSE2" | jq -r '.summary.mind_reading_encoding_model_combo')
 
-if [ "$ACCURACY1" != "$ACCURACY2" ]; then
-    echo_error "Results differ between requests!"
-    echo_error "First accuracy: ${ACCURACY1}"
-    echo_error "Second accuracy: ${ACCURACY2}"
+if [ "$BRAIN_PRED1" != "$BRAIN_PRED2" ]; then
+    echo_error "Brain prediction results differ between requests!"
+    echo_error "First: ${BRAIN_PRED1}"
+    echo_error "Second: ${BRAIN_PRED2}"
+    exit 1
+fi
+
+if [ "$MIND_READ1" != "$MIND_READ2" ]; then
+    echo_error "Mind reading results differ between requests!"
+    echo_error "First: ${MIND_READ1}"
+    echo_error "Second: ${MIND_READ2}"
     exit 1
 fi
 

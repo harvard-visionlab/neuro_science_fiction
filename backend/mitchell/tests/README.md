@@ -174,24 +174,43 @@ curl -X POST ${RUN_ANALYSIS_URL} \
   "cached": false,
   "config": {
     "brain_subject": 1,
-    "year": 2001,
-    "group_name": "workshop-2025-01",
+    "year": 2022,
+    "group_name": "dopaminemachine",
     "num_voxels": 500,
-    "zscore_braindata": true,
+    "zscore_braindata": false,
     "testIndividualFeatures": false,
-    ...
+    "num_features": 16,
+    "num_iterations": 1770,
+    "timestamp": "2025-10-25T03:45:00.123456",
+    "elapsed_time": 122.61,
+    "s3_path": "s3://neuroscience-fiction/analysis-results/..."
   },
   "summary": {
     "num_iterations": 1770,
-    "elapsed_time": 18.45,
-    "elapsed_time_minutes": 0.31,
-    "total_accuracy": 0.8531,
-    ...
+    "elapsed_time": 122.61,
+    "elapsed_time_minutes": 2.04,
+    "brain_prediction_encoding_model_individual": 0.8576,
+    "brain_prediction_encoding_model_combo": 0.9316,
+    "brain_prediction_botastic_templates_individual": 0.8768,
+    "brain_prediction_botastic_templates_combo": 0.9486,
+    "mind_reading_encoding_model_individual": 0.8189,
+    "mind_reading_encoding_model_combo": 0.9107,
+    "mind_reading_botastic_templates_individual": 0.8749,
+    "mind_reading_botastic_templates_combo": 0.9395,
+    "same_category_accuracy": 0.6667,
+    "different_category_accuracy": 0.9509,
+    "mean_r2_score": 0.5495
   },
   "s3_urls": {
-    "results_csv": "https://...",
-    "all_betas": "https://...",
-    "config": "https://..."
+    "results_csv": "https://neuroscience-fiction.s3.us-east-1.amazonaws.com/.../results.csv",
+    "all_betas_pth": "https://neuroscience-fiction.s3.us-east-1.amazonaws.com/.../all_betas.pth",
+    "config_json": "https://neuroscience-fiction.s3.us-east-1.amazonaws.com/.../config.json",
+    "results_by_feature_csv": "https://... (only if testIndividualFeatures=true)"
+  },
+  "files": {
+    "results_csv_size_mb": 2.55,
+    "all_betas_pth_size_mb": 168.32,
+    "config_json_size_mb": 0.0
   }
 }
 ```

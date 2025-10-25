@@ -75,14 +75,18 @@ validate_json_field "$RESPONSE" "s3_urls" || exit 1
 # Check summary fields
 CACHED=$(echo "$RESPONSE" | jq -r '.cached')
 NUM_ITERATIONS=$(echo "$RESPONSE" | jq -r '.summary.num_iterations')
-TOTAL_ACCURACY=$(echo "$RESPONSE" | jq -r '.summary.total_accuracy')
 ELAPSED_TIME=$(echo "$RESPONSE" | jq -r '.summary.elapsed_time')
+BRAIN_PRED_COMBO=$(echo "$RESPONSE" | jq -r '.summary.brain_prediction_encoding_model_combo')
+MIND_READ_COMBO=$(echo "$RESPONSE" | jq -r '.summary.mind_reading_encoding_model_combo')
+MEAN_R2=$(echo "$RESPONSE" | jq -r '.summary.mean_r2_score')
 
 echo ""
 echo_info "Results:"
 echo_info "  Cached: ${CACHED}"
 echo_info "  Iterations: ${NUM_ITERATIONS}"
-echo_info "  Total accuracy: ${TOTAL_ACCURACY}"
+echo_info "  Brain prediction (combo): ${BRAIN_PRED_COMBO}"
+echo_info "  Mind reading (combo): ${MIND_READ_COMBO}"
+echo_info "  Mean R² score: ${MEAN_R2}"
 echo_info "  Lambda execution time: ${ELAPSED_TIME}s"
 
 # Validate critical values
@@ -91,16 +95,21 @@ if [ "$NUM_ITERATIONS" = "null" ] || [ "$NUM_ITERATIONS" = "0" ]; then
     exit 1
 fi
 
-if [ "$TOTAL_ACCURACY" = "null" ]; then
-    echo_error "Missing total_accuracy"
+if [ "$BRAIN_PRED_COMBO" = "null" ]; then
+    echo_error "Missing brain_prediction_encoding_model_combo"
+    exit 1
+fi
+
+if [ "$MIND_READ_COMBO" = "null" ]; then
+    echo_error "Missing mind_reading_encoding_model_combo"
     exit 1
 fi
 
 # Check S3 URLs (should include results_by_feature.csv for full mode)
 RESULTS_CSV=$(echo "$RESPONSE" | jq -r '.s3_urls.results_csv')
-RESULTS_BY_FEATURE=$(echo "$RESPONSE" | jq -r '.s3_urls.results_by_feature')
-ALL_BETAS=$(echo "$RESPONSE" | jq -r '.s3_urls.all_betas')
-CONFIG_JSON=$(echo "$RESPONSE" | jq -r '.s3_urls.config')
+RESULTS_BY_FEATURE=$(echo "$RESPONSE" | jq -r '.s3_urls.results_by_feature_csv')
+ALL_BETAS=$(echo "$RESPONSE" | jq -r '.s3_urls.all_betas_pth')
+CONFIG_JSON=$(echo "$RESPONSE" | jq -r '.s3_urls.config_json')
 
 echo ""
 echo_info "S3 URLs:"

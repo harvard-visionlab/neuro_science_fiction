@@ -124,13 +124,22 @@ if [ "$ELAPSED2" -lt 10 ]; then
 fi
 
 # Results should still be consistent (same accuracy)
-ACCURACY1=$(echo "$RESPONSE1" | jq -r '.summary.total_accuracy')
-ACCURACY2=$(echo "$RESPONSE2" | jq -r '.summary.total_accuracy')
+BRAIN_PRED1=$(echo "$RESPONSE1" | jq -r '.summary.brain_prediction_encoding_model_combo')
+BRAIN_PRED2=$(echo "$RESPONSE2" | jq -r '.summary.brain_prediction_encoding_model_combo')
+MIND_READ1=$(echo "$RESPONSE1" | jq -r '.summary.mind_reading_encoding_model_combo')
+MIND_READ2=$(echo "$RESPONSE2" | jq -r '.summary.mind_reading_encoding_model_combo')
 
-if [ "$ACCURACY1" != "$ACCURACY2" ]; then
-    echo_error "Accuracy differs after overwrite!"
-    echo_error "Original: ${ACCURACY1}"
-    echo_error "Overwritten: ${ACCURACY2}"
+if [ "$BRAIN_PRED1" != "$BRAIN_PRED2" ]; then
+    echo_error "Brain prediction results differ after overwrite!"
+    echo_error "Original: ${BRAIN_PRED1}"
+    echo_error "Overwritten: ${BRAIN_PRED2}"
+    exit 1
+fi
+
+if [ "$MIND_READ1" != "$MIND_READ2" ]; then
+    echo_error "Mind reading results differ after overwrite!"
+    echo_error "Original: ${MIND_READ1}"
+    echo_error "Overwritten: ${MIND_READ2}"
     exit 1
 fi
 
